@@ -1,0 +1,15 @@
+import * as THREE from "three";
+
+export const TERRAIN_CENTER_LAT = 24.35;
+export const TERRAIN_CENTER_LON = 54.62;
+export const TERRAIN_ZOOM = 13;
+export const TERRAIN_GRID_SIZE = 5;
+export const TILE_PX = 256;
+export const EARTH_CIRCUMFERENCE = 40075016.686;
+export const TERRAIN_METERS_PER_TILE =
+  (EARTH_CIRCUMFERENCE * Math.cos(THREE.MathUtils.degToRad(TERRAIN_CENTER_LAT))) /
+  (2 ** TERRAIN_ZOOM);
+export const TERRAIN_WORLD_SIZE = TERRAIN_METERS_PER_TILE * TERRAIN_GRID_SIZE;
+export const COAST_OFFSET = 5200;
+export const RUNWAY_CORRIDOR_HALF_WIDTH = 120;
+export const RUNWAY_CORRIDOR_HALF_LENGTH = 2600;

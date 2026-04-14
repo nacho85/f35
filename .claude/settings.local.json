@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e ':*)",
+      "Bash(\"C:\\\\Program Files\\\\Blender Foundation\\\\Blender 5.1\\\\blender.exe\" --background \"C:\\\\Users\\\\nacho\\\\OneDrive\\\\Desktop\\\\F35C - Copy\\\\F-35C.blend1\" --python \"C:\\\\Users\\\\nacho\\\\OneDrive\\\\Desktop\\\\F35C - Copy\\\\animate_gear.py\")",
+      "Bash(blender --background \"F-35C.blend\" --python fix_export.py)",
+      "Bash(\"/c/Program Files/Blender Foundation/Blender 5.1/blender.exe\" --background \"C:/Users/nacho/OneDrive/Desktop/F35C - Copy/F-35C.blend\" --python \"C:/Users/nacho/OneDrive/Desktop/F35C - Copy/fix_export.py\")",
+      "Bash(\"/c/Program Files/Blender Foundation/Blender 5.1/blender.exe\" --background \"C:/Users/nacho/OneDrive/Desktop/F35C - Copy/F-35C.blend\" --python \"C:/Users/nacho/OneDrive/Desktop/F35C - Copy/inspect_front_gear.py\")",
+      "Bash(\"/c/Program Files/Blender Foundation/Blender 5.1/blender.exe\" --background \"C:/Users/nacho/OneDrive/Desktop/F35C - Copy/F-35C.blend\" --python \"C:/Users/nacho/OneDrive/Desktop/F35C - Copy/inspect_front_gear3.py\")",
+      "Bash(\"/c/Program Files/Blender Foundation/Blender 5.1/blender.exe\" --background \"C:/Users/nacho/OneDrive/Desktop/F35C - Copy/F-35C.blend\" --python \"C:/Users/nacho/OneDrive/Desktop/F35C - Copy/fix_export_v2.py\")",
+      "Bash(\"/c/Program Files/Blender Foundation/Blender 5.1/blender.exe\" --background \"C:/Users/nacho/OneDrive/Desktop/F35C - Copy/F-35C.blend\" --python \"C:/Users/nacho/OneDrive/Desktop/F35C - Copy/animate_gear_v4.py\")",
+      "Bash(\"/c/Program Files/Blender Foundation/Blender 5.1/blender.exe\" --background \"C:/Users/nacho/OneDrive/Desktop/F35C - Copy/F-35C.blend\" --python \"C:/Users/nacho/OneDrive/Desktop/F35C - Copy/animate_gear_v5.py\")",
+      "Bash(\"/c/Program Files/Blender Foundation/Blender 5.1/blender.exe\" --background \"C:/Users/nacho/OneDrive/Desktop/F35C - Copy/F-35C.blend\" --python \"C:/Users/nacho/OneDrive/Desktop/F35C - Copy/animate_gear_v6.py\")"
+    ]
+  }
+}
