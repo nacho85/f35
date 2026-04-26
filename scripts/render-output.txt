@@ -1,0 +1,499 @@
+13:40:15 | INFO: Data are loaded, start creating Blender stuff
+13:40:15 | INFO: Blender create Mesh node Plane.015
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.015
+13:40:15 | INFO: Blender create Mesh node Cylinder.040
+13:40:15 | INFO: Draco Decoder: Decode primitive Cylinder.040
+13:40:15 | INFO: Blender create Mesh node Plane.016
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.016
+13:40:15 | INFO: Blender create Mesh node Plane.025
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.025
+13:40:15 | INFO: Blender create Mesh node Plane.026
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.026
+13:40:15 | INFO: Blender create Mesh node Plane.029
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.029
+13:40:15 | INFO: Blender create Mesh node Plane.030
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.030
+13:40:15 | INFO: Blender create Mesh node Cylinder.002
+13:40:15 | INFO: Draco Decoder: Decode primitive Cylinder.002
+13:40:15 | INFO: Blender create Mesh node Plane.003
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.003
+13:40:15 | INFO: Blender create Mesh node Plane.023
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.023
+13:40:15 | INFO: Blender create Mesh node Plane.022
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.022
+13:40:15 | INFO: Blender create Mesh node Plane
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane
+13:40:15 | INFO: Blender create Mesh node Plane.063
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.063
+13:40:15 | INFO: Blender create Mesh node Plane.021
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.021
+13:40:15 | INFO: Blender create Mesh node Plane.031
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.031
+13:40:15 | INFO: Blender create Mesh node Plane.027
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.027
+13:40:15 | INFO: Blender create Mesh node Plane.074
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.074
+13:40:15 | INFO: Blender create Mesh node Plane.073
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.073
+13:40:15 | INFO: Blender create Mesh node Plane.041
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.041
+13:40:15 | INFO: Blender create Mesh node Plane.042
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.042
+13:40:15 | INFO: Blender create Mesh node Plane.044
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.044
+13:40:15 | INFO: Blender create Mesh node Plane.058
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.058
+13:40:15 | INFO: Blender create Mesh node Plane.060
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.060
+13:40:15 | INFO: Blender create Mesh node Plane.061
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.061
+13:40:15 | INFO: Blender create Mesh node Plane.064
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.064
+13:40:15 | INFO: Blender create Mesh node Plane.069
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.069
+13:40:15 | INFO: Blender create Mesh node Plane.070
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.070
+13:40:15 | INFO: Blender create Mesh node Plane.071
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.071
+13:40:15 | INFO: Blender create Mesh node Plane.072
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.072
+13:40:15 | INFO: Blender create Mesh node Cube
+13:40:15 | INFO: Draco Decoder: Decode primitive Cube
+13:40:15 | INFO: Blender create Mesh node Cube.001
+13:40:15 | INFO: Draco Decoder: Decode primitive Cube.001
+13:40:15 | INFO: Blender create Mesh node Plane.001
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.001
+13:40:15 | INFO: Blender create Mesh node Glass
+13:40:15 | INFO: Draco Decoder: Decode primitive Glass
+13:40:15 | INFO: Blender create Mesh node Plane.135
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.135
+13:40:15 | INFO: Blender create Mesh node Plane.134
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.134
+13:40:15 | INFO: Blender create Mesh node Plane.139
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.139
+13:40:15 | INFO: Blender create Mesh node Plane.138
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.138
+13:40:15 | INFO: Blender create Mesh node Plane.131
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.131
+13:40:15 | INFO: Blender create Mesh node Plane.075
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.075
+13:40:15 | INFO: Blender create Mesh node Plane.076
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.076
+13:40:15 | INFO: Blender create Mesh node Plane.077
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.077
+13:40:15 | INFO: Blender create Mesh node Plane.130
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.130
+13:40:15 | INFO: Blender create Mesh node Plane.129
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.129
+13:40:15 | INFO: Blender create Mesh node Plane.086
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.086
+13:40:15 | INFO: Blender create Mesh node Plane.085
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.085
+13:40:15 | INFO: Blender create Mesh node Plane.084
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.084
+13:40:15 | INFO: Blender create Mesh node Plane.083
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.083
+13:40:15 | INFO: Blender create Mesh node Plane.082
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.082
+13:40:15 | INFO: Blender create Mesh node Plane.081
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.081
+13:40:15 | INFO: Blender create Mesh node Plane.080
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.080
+13:40:15 | INFO: Blender create Mesh node Plane.079
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.079
+13:40:15 | INFO: Blender create Mesh node Plane.078
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.078
+13:40:15 | INFO: Blender create Mesh node Plane.040
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.040
+13:40:15 | INFO: Blender create Mesh node rafale-body.018
+13:40:15 | INFO: Draco Decoder: Decode primitive rafale-body.018
+13:40:15 | INFO: Blender create Mesh node rafale-body.017
+13:40:15 | INFO: Draco Decoder: Decode primitive rafale-body.017
+13:40:15 | INFO: Blender create Mesh node Plane.133
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.133
+13:40:15 | INFO: Blender create Mesh node Plane.019
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.019
+13:40:15 | INFO: Blender create Mesh node Plane.020
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.020
+13:40:15 | INFO: Blender create Mesh node Plane.017
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.017
+13:40:15 | INFO: Blender create Mesh node Plane.018
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.018
+13:40:15 | INFO: Blender create Mesh node Plane.128
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.128
+13:40:15 | INFO: Blender create Mesh node Plane.127
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.127
+13:40:15 | INFO: Blender create Mesh node Plane.126
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.126
+13:40:15 | INFO: Blender create Mesh node Plane.125
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.125
+13:40:15 | INFO: Blender create Mesh node Plane.124
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.124
+13:40:15 | INFO: Blender create Mesh node Plane.123
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.123
+13:40:15 | INFO: Blender create Mesh node Plane.115
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.115
+13:40:15 | INFO: Blender create Mesh node Plane.109
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.109
+13:40:15 | INFO: Blender create Mesh node Plane.108
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.108
+13:40:15 | INFO: Blender create Mesh node Plane.107
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.107
+13:40:15 | INFO: Blender create Mesh node Plane.106
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.106
+13:40:15 | INFO: Blender create Mesh node Plane.105
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.105
+13:40:15 | INFO: Blender create Mesh node Plane.104
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.104
+13:40:15 | INFO: Blender create Mesh node Plane.068
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.068
+13:40:15 | INFO: Blender create Mesh node Plane.067
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.067
+13:40:15 | INFO: Blender create Mesh node Plane.066
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.066
+13:40:15 | INFO: Blender create Mesh node Plane.065
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.065
+13:40:15 | INFO: Blender create Mesh node Plane.051
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.051
+13:40:15 | INFO: Blender create Mesh node Plane.046
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.046
+13:40:15 | INFO: Blender create Mesh node Plane.087
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.087
+13:40:15 | INFO: Blender create Mesh node Plane.088
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.088
+13:40:15 | INFO: Blender create Mesh node Plane.090
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.090
+Blender 5.1.0 (hash adfe2921d5f3 built 2026-03-17 01:37:32)
+DracoDecoder | Decoded 4140 vertices, 19407 indices
+DracoDecoder | Decoded 2209 vertices, 10986 indices
+DracoDecoder | Decoded 854 vertices, 4566 indices
+DracoDecoder | Decoded 12908 vertices, 26712 indices
+DracoDecoder | Decoded 9023 vertices, 50937 indices
+DracoDecoder | Decoded 782 vertices, 4272 indices
+DracoDecoder | Decoded 4071 vertices, 19173 indices
+DracoDecoder | Decoded 2198 vertices, 10986 indices
+DracoDecoder | Decoded 8783 vertices, 43659 indices
+DracoDecoder | Decoded 42 vertices, 192 indices
+DracoDecoder | Decoded 40 vertices, 180 indices
+DracoDecoder | Decoded 1140 vertices, 3852 indices
+DracoDecoder | Decoded 733 vertices, 2970 indices
+DracoDecoder | Decoded 45 vertices, 192 indices
+DracoDecoder | Decoded 191 vertices, 798 indices
+DracoDecoder | Decoded 186 vertices, 786 indices
+DracoDecoder | Decoded 189 vertices, 798 indices
+DracoDecoder | Decoded 191 vertices, 798 indices
+DracoDecoder | Decoded 205 vertices, 798 indices
+DracoDecoder | Decoded 191 vertices, 798 indices
+DracoDecoder | Decoded 195 vertices, 798 indices
+DracoDecoder | Decoded 193 vertices, 798 indices
+DracoDecoder | Decoded 189 vertices, 798 indices
+DracoDecoder | Decoded 189 vertices, 798 indices
+DracoDecoder | Decoded 193 vertices, 798 indices
+DracoDecoder | Decoded 189 vertices, 798 indices
+DracoDecoder | Decoded 189 vertices, 798 indices
+DracoDecoder | Decoded 191 vertices, 798 indices
+DracoDecoder | Decoded 191 vertices, 798 indices
+DracoDecoder | Decoded 1414 vertices, 2478 indices
+DracoDecoder | Decoded 1022 vertices, 1806 indices
+DracoDecoder | Decoded 13066 vertices, 50166 indices
+DracoDecoder | Decoded 275 vertices, 1137 indices
+DracoDecoder | Decoded 384 vertices, 816 indices
+DracoDecoder | Decoded 704 vertices, 2010 indices
+DracoDecoder | Decoded 384 vertices, 816 indices
+DracoDecoder | Decoded 704 vertices, 2010 indices
+DracoDecoder | Decoded 40 vertices, 60 indices
+DracoDecoder | Decoded 40 vertices, 60 indices
+DracoDecoder | Decoded 40 vertices, 60 indices
+DracoDecoder | Decoded 40 vertices, 60 indices
+DracoDecoder | Decoded 40 vertices, 60 indices
+DracoDecoder | Decoded 40 vertices, 60 indices
+DracoDecoder | Decoded 40 vertices, 60 indices
+DracoDecoder | Decoded 40 vertices, 60 indices
+DracoDecoder | Decoded 40 vertices, 60 indices
+DracoDecoder | Decoded 40 vertices, 60 indices
+DracoDecoder | Decoded 40 vertices, 60 indices
+DracoDecoder | Decoded 40 vertices, 60 indices
+DracoDecoder | Decoded 40 vertices, 60 indices
+DracoDecoder | Decoded 40 vertices, 60 indices
+DracoDecoder | Decoded 40 vertices, 60 indices
+DracoDecoder | Decoded 47 vertices, 180 indices
+DracoDecoder | Decoded 987 vertices, 5469 indices
+DracoDecoder | Decoded 493 vertices, 1911 indices
+DracoDecoder | Decoded 8405 vertices, 17070 indices
+DracoDecoder | Decoded 3777 vertices, 18666 indices
+DracoDecoder | Decoded 3783 vertices, 18714 indices
+DracoDecoder | Decoded 3870 vertices, 19176 indices
+DracoDecoder | Decoded 3829 vertices, 18984 indices
+DracoDecoder | Decoded 6889 vertices, 21906 indices
+DracoDecoder | Decoded 271 vertices, 858 indices
+DracoDecoder | Decoded 272 vertices, 861 indices
+DracoDecoder | Decoded 272 vertices, 861 indices
+DracoDecoder | Decoded 24 vertices, 48 indices
+DracoDecoder | Decoded 26 vertices, 48 indices
+DracoDecoder | Decoded 137 vertices, 402 indices
+DracoDecoder | Decoded 24 vertices, 48 indices
+DracoDecoder | Decoded 138 vertices, 405 indices
+DracoDecoder | Decoded 24 vertices, 48 indices
+DracoDecoder | Decoded 66 vertices, 246 indices
+DracoDecoder | Decoded 201 vertices, 858 indices
+DracoDecoder | Decoded 201 vertices, 858 indices
+DracoDecoder | Decoded 3741 vertices, 13389 indices
+DracoDecoder | Decoded 133 vertices, 402 indices
+DracoDecoder | Decoded 135 vertices, 408 indices
+DracoDecoder | Decoded 258 vertices, 726 indices
+DracoDecoder | Decoded 238 vertices, 1053 indices
+DracoDecoder | Decoded 32 vertices, 180 indices
+DracoDecoder | Decoded 202 vertices, 858 indices
+DracoDecoder | Decoded 3566 vertices, 11934 indices
+DracoDecoder | Decoded 314 vertices, 1002 indi13:40:15 | INFO: Blender create Mesh node Plane.091
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.091
+13:40:15 | INFO: Blender create Mesh node Plane.093
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.093
+13:40:15 | INFO: Blender create Mesh node Plane.094
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.094
+13:40:15 | INFO: Blender create Mesh node Plane.095
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.095
+13:40:15 | INFO: Blender create Mesh node Plane.096
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.096
+13:40:15 | INFO: Blender create Mesh node Plane.097
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.097
+13:40:15 | INFO: Blender create Mesh node Plane.098
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.098
+13:40:15 | INFO: Blender create Mesh node Plane.099
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.099
+13:40:15 | INFO: Blender create Mesh node Plane.100
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.100
+13:40:15 | INFO: Blender create Mesh node Plane.101
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.101
+13:40:15 | INFO: Blender create Mesh node Plane.102
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.102
+13:40:15 | INFO: Blender create Mesh node Plane.103
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.103
+13:40:15 | INFO: Blender create Mesh node Plane.119
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.119
+13:40:15 | INFO: Blender create Mesh node Plane.120
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.120
+13:40:15 | INFO: Blender create Mesh node Plane.121
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.121
+13:40:15 | INFO: Blender create Mesh node Plane.122
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.122
+13:40:15 | INFO: Blender create Mesh node Plane.110
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.110
+13:40:15 | INFO: Blender create Mesh node Plane.111
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.111
+13:40:15 | INFO: Blender create Mesh node Plane.118
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.118
+13:40:15 | INFO: Blender create Mesh node Plane.112
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.112
+13:40:15 | INFO: Blender create Mesh node Plane.113
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.113
+13:40:15 | INFO: Blender create Mesh node Plane.114
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.114
+13:40:15 | INFO: Blender create Mesh node Plane.116
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.116
+13:40:15 | INFO: Blender create Mesh node Plane.117
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.117
+13:40:15 | INFO: Blender create Mesh node Plane.028
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.028
+13:40:15 | INFO: Blender create Mesh node Plane.089
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.089
+13:40:15 | INFO: Blender create Mesh node Plane.092
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.092
+13:40:15 | INFO: Blender create Mesh node Cylinder.041
+13:40:15 | INFO: Draco Decoder: Decode primitive Cylinder.041
+13:40:15 | INFO: Blender create Mesh node Cylinder.001
+13:40:15 | INFO: Draco Decoder: Decode primitive Cylinder.001
+13:40:15 | INFO: Blender create Mesh node Plane.062
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.062
+13:40:15 | INFO: Blender create Mesh node Plane.002
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.002
+13:40:15 | INFO: Blender create Mesh node Plane.004
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.004
+13:40:15 | INFO: Blender create Mesh node Plane.005
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.005
+13:40:15 | INFO: Blender create Mesh node Plane.006
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.006
+13:40:15 | INFO: Blender create Mesh node Plane.012
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.012
+13:40:15 | INFO: Blender create Mesh node Plane.009
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.009
+13:40:15 | INFO: Blender create Mesh node Plane.014
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.014
+13:40:15 | INFO: Blender create Mesh node Plane.013
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.013
+13:40:15 | INFO: Blender create Mesh node Plane.010
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.010
+13:40:15 | INFO: Blender create Mesh node Plane.011
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.011
+13:40:15 | INFO: Blender create Mesh node Plane.008
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.008
+13:40:15 | INFO: Blender create Mesh node Plane.007
+13:40:15 | INFO: Draco Decoder: Decode primitive Plane.007
+13:40:15 | INFO: Blender create Mesh node Helmet.002
+13:40:15 | INFO: Draco Decoder: Decode primitive Helmet.002
+13:40:16 | INFO: Blender create Mesh node Object_3.001
+13:40:16 | INFO: Draco Decoder: Decode primitive Object_3.001
+13:40:16 | INFO: Blender create Mesh node seat.001
+13:40:16 | INFO: Draco Decoder: Decode primitive seat.001
+13:40:16 | INFO: Blender create Mesh node Sphere.001
+13:40:16 | INFO: Draco Decoder: Decode primitive Sphere.001
+13:40:16 | INFO: Blender create Mesh node Sphere.002
+13:40:16 | INFO: Draco Decoder: Decode primitive Sphere.002
+13:40:16 | INFO: Blender create Mesh node Sphere.003
+13:40:16 | INFO: Draco Decoder: Decode primitive Sphere.003
+13:40:16 | INFO: Blender create Mesh node Cube.042
+13:40:16 | INFO: Draco Decoder: Decode primitive Cube.042
+13:40:16 | INFO: Blender create Mesh node Sphere.005
+13:40:16 | INFO: Draco Decoder: Decode primitive Sphere.005
+13:40:16 | INFO: Blender create Mesh node Sphere.006
+13:40:16 | INFO: Draco Decoder: Decode primitive Sphere.006
+13:40:16 | INFO: Blender create Mesh node Plane.132
+13:40:16 | INFO: Draco Decoder: Decode primitive Plane.132
+13:40:16 | INFO: Blender create Mesh node bf4_missiles.002
+13:40:16 | INFO: Draco Decoder: Decode primitive bf4_missiles.002
+13:40:16 | INFO: Blender create Mesh node Plane.059
+13:40:16 | INFO: Draco Decoder: Decode primitive Plane.059
+13:40:16 | INFO: Blender create Mesh node Plane.032
+13:40:16 | INFO: Draco Decoder: Decode primitive Plane.032
+13:40:16 | INFO: Blender create Mesh node Plane.024
+13:40:16 | INFO: Draco Decoder: Decode primitive Plane.024
+13:40:16 | INFO: Blender create Mesh node Plane.033
+13:40:16 | INFO: Draco Decoder: Decode primitive Plane.033
+13:40:16 | INFO: Blender create Mesh node Plane.034
+13:40:16 | INFO: Draco Decoder: Decode primitive Plane.034
+13:40:16 | INFO: Blender create Mesh node Plane.035
+13:40:16 | INFO: Draco Decoder: Decode primitive Plane.035
+13:40:16 | INFO: Blender create Mesh node Plane.036
+13:40:16 | INFO: Draco Decoder: Decode primitive Plane.036
+13:40:16 | INFO: Blender create Mesh node Plane.037
+13:40:16 | INFO: Draco Decoder: Decode primitive Plane.037
+13:40:16 | INFO: Blender create Mesh node Plane.038
+13:40:16 | INFO: Draco Decoder: Decode primitive Plane.038
+13:40:16 | INFO: Blender create Mesh node Plane.039
+13:40:16 | INFO: Draco Decoder: Decode primitive Plane.039
+13:40:16 | INFO: Blender create Mesh node Plane.043
+13:40:16 | INFO: Draco Decoder: Decode primitive Plane.043
+13:40:16 | INFO: Blender create Mesh node Plane.045
+13:40:16 | INFO: Draco Decoder: Decode primitive Plane.045
+13:40:16 | INFO: Blender create Mesh node Plane.047
+13:40:16 | INFO: Draco Decoder: Decode primitive Plane.047
+13:40:16 | INFO: Blender create Mesh node Plane.057
+13:40:16 | INFO: Draco Decoder: Decode primitive Plane.057
+13:40:16 | INFO: Blender create Mesh node Plane.048
+13:40:16 | INFO: Draco Decoder: Decode primitive Plane.048
+13:40:16 | INFO: Blender create Mesh node Plane.049
+13:40:16 | INFO: Draco Decoder: Decode primitive Plane.049
+13:40:16 | INFO: Blender create Mesh node Plane.050
+13:40:16 | INFO: Draco Decoder: Decode primitive Plane.050
+13:40:16 | INFO: Blender create Mesh node Plane.052
+13:40:16 | INFO: Draco Decoder: Decode primitive Plane.052
+13:40:16 | INFO: Blender create Mesh node Plane.053
+13:40:16 | INFO: Draco Decoder: Decode primitive Plane.053
+13:40:16 | INFO: Blender create Mesh node Plane.054
+13:40:16 | INFO: Draco Decoder: Decode primitive Plane.054
+13:40:16 | INFO: Blender create Mesh node Plane.055
+13:40:16 | INFO: Draco Decoder: Decode primitive Plane.055
+13:40:16 | INFO: Blender create Mesh node Plane.056
+13:40:16 | INFO: Draco Decoder: Decode primitive Plane.056
+13:40:16 | INFO: glTF import finished in 1.26s
+  F-35C-BODY.046: center=(3.10,6.45,1.88)
+  F-35C-BODY.047: center=(3.40,6.20,2.35)
+  F-35C-BODY.048: center=(3.27,6.28,1.85)
+  F-35C-BODY.049: center=(-0.09,5.71,2.24)
+  F-35C-BODY.050: center=(-0.26,6.09,1.64)
+  F-35C-BODY.051: center=(-0.52,6.11,2.45)
+  F-35C-BODY.052: center=(-0.41,6.28,1.87)
+
+[INFO] Centro gear: (1.21, 6.16, 2.04)
+00:03.406  render           | Saved: 'C:\devs\f35\scripts\renders\gear_f01.png'
+[CAM] pos=(1.21,4.36,6.84)
+[RENDER] frame 1 -> C:\devs\f35\scripts\renders\gear_f01.png
+00:03.515  render           | Saved: 'C:\devs\f35\scripts\renders\gear_f20.png'
+[RENDER] frame 20 -> C:\devs\f35\scripts\renders\gear_f20.png
+00:03.625  render           | Saved: 'C:\devs\f35\scripts\renders\gear_f24.png'
+[RENDER] frame 24 -> C:\devs\f35\scripts\renders\gear_f24.png
+00:03.718  render           | Saved: 'C:\devs\f35\scripts\renders\gear_f26.png'
+[RENDER] frame 26 -> C:\devs\f35\scripts\renders\gear_f26.png
+00:03.812  render           | Saved: 'C:\devs\f35\scripts\renders\gear_f28.png'
+[RENDER] frame 28 -> C:\devs\f35\scripts\renders\gear_f28.png
+00:03.921  render           | Saved: 'C:\devs\f35\scripts\renders\gear_f30.png'
+[RENDER] frame 30 -> C:\devs\f35\scripts\renders\gear_f30.png
+[DONE]
+ces
+DracoDecoder | Decoded 45 vertices, 114 indices
+DracoDecoder | Decoded 171 vertices, 498 indices
+DracoDecoder | Decoded 153 vertices, 423 indices
+DracoDecoder | Decoded 146 vertices, 402 indices
+DracoDecoder | Decoded 155 vertices, 429 indices
+DracoDecoder | Decoded 241 vertices, 1050 indices
+DracoDecoder | Decoded 242 vertices, 1050 indices
+DracoDecoder | Decoded 248 vertices, 1050 indices
+DracoDecoder | Decoded 250 vertices, 1050 indices
+DracoDecoder | Decoded 135 vertices, 411 indices
+DracoDecoder | Decoded 135 vertices, 411 indices
+DracoDecoder | Decoded 132 vertices, 402 indices
+DracoDecoder | Decoded 70 vertices, 246 indices
+DracoDecoder | Decoded 70 vertices, 246 indices
+DracoDecoder | Decoded 109 vertices, 426 indices
+DracoDecoder | Decoded 316 vertices, 1434 indices
+DracoDecoder | Decoded 140 vertices, 576 indices
+DracoDecoder | Decoded 140 vertices, 576 indices
+DracoDecoder | Decoded 141 vertices, 579 indices
+DracoDecoder | Decoded 50 vertices, 120 indices
+DracoDecoder | Decoded 480 vertices, 1452 indices
+DracoDecoder | Decoded 130 vertices, 402 indices
+DracoDecoder | Decoded 275 vertices, 1242 indices
+DracoDecoder | Decoded 109 vertices, 426 indices
+DracoDecoder | Decoded 236 vertices, 1050 indices
+DracoDecoder | Decoded 72 vertices, 354 indices
+DracoDecoder | Decoded 103 vertices, 291 indices
+DracoDecoder | Decoded 2203 vertices, 11238 indices
+DracoDecoder | Decoded 2203 vertices, 11238 indices
+DracoDecoder | Decoded 3026 vertices, 11934 indices
+DracoDecoder | Decoded 173 vertices, 882 indices
+DracoDecoder | Decoded 173 vertices, 882 indices
+DracoDecoder | Decoded 13 vertices, 48 indices
+DracoDecoder | Decoded 13 vertices, 48 indices
+DracoDecoder | Decoded 17 vertices, 66 indices
+DracoDecoder | Decoded 17 vertices, 48 indices
+DracoDecoder | Decoded 26 vertices, 102 indices
+DracoDecoder | Decoded 21 vertices, 84 indices
+DracoDecoder | Decoded 24 vertices, 90 indices
+DracoDecoder | Decoded 63 vertices, 222 indices
+DracoDecoder | Decoded 49 vertices, 180 indices
+DracoDecoder | Decoded 24 vertices, 84 indices
+DracoDecoder | Decoded 118472 vertices, 616659 indices
+DracoDecoder | Decoded 16006 vertices, 86646 indices
+DracoDecoder | Decoded 34156 vertices, 133872 indices
+DracoDecoder | Decoded 992 vertices, 1440 indices
+DracoDecoder | Decoded 992 vertices, 1440 indices
+DracoDecoder | Decoded 992 vertices, 1440 indices
+DracoDecoder | Decoded 24 vertices, 36 indices
+DracoDecoder | Decoded 992 vertices, 1440 indices
+DracoDecoder | Decoded 992 vertices, 1440 indices
+DracoDecoder | Decoded 54 vertices, 78 indices
+DracoDecoder | Decoded 50487 vertices, 207156 indices
+DracoDecoder | Decoded 2860 vertices, 8958 indices
+DracoDecoder | Decoded 315 vertices, 1242 indices
+DracoDecoder | Decoded 5490 vertices, 11010 indices
+DracoDecoder | Decoded 263 vertices, 978 indices
+DracoDecoder | Decoded 21261 vertices, 72519 indices
+DracoDecoder | Decoded 1814 vertices, 5385 indices
+DracoDecoder | Decoded 2836 vertices, 10218 indices
+DracoDecoder | Decoded 804 vertices, 2208 indices
+DracoDecoder | Decoded 351 vertices, 1008 indices
+DracoDecoder | Decoded 11036 vertices, 44070 indices
+DracoDecoder | Decoded 1439 vertices, 2703 indices
+DracoDecoder | Decoded 1200 vertices, 3402 indices
+DracoDecoder | Decoded 3241 vertices, 11160 indices
+DracoDecoder | Decoded 15468 vertices, 50385 indices
+DracoDecoder | Decoded 3014 vertices, 11934 indices
+DracoDecoder | Decoded 3049 vertices, 11328 indices
+DracoDecoder | Decoded 1256 vertices, 3504 indices
+DracoDecoder | Decoded 1282 vertices, 2448 indices
+DracoDecoder | Decoded 3020 vertices, 11934 indices
+DracoDecoder | Decoded 3156 vertices, 11820 indices
+DracoDecoder | Decoded 3219 vertices, 11334 indices
+DracoDecoder | Decoded 14832 vertices, 46122 indices
+
+Blender quit

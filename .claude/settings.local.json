@@ -10,7 +10,25 @@
       "Bash(\"/c/Program Files/Blender Foundation/Blender 5.1/blender.exe\" --background \"C:/Users/nacho/OneDrive/Desktop/F35C - Copy/F-35C.blend\" --python \"C:/Users/nacho/OneDrive/Desktop/F35C - Copy/fix_export_v2.py\")",
       "Bash(\"/c/Program Files/Blender Foundation/Blender 5.1/blender.exe\" --background \"C:/Users/nacho/OneDrive/Desktop/F35C - Copy/F-35C.blend\" --python \"C:/Users/nacho/OneDrive/Desktop/F35C - Copy/animate_gear_v4.py\")",
       "Bash(\"/c/Program Files/Blender Foundation/Blender 5.1/blender.exe\" --background \"C:/Users/nacho/OneDrive/Desktop/F35C - Copy/F-35C.blend\" --python \"C:/Users/nacho/OneDrive/Desktop/F35C - Copy/animate_gear_v5.py\")",
-      "Bash(\"/c/Program Files/Blender Foundation/Blender 5.1/blender.exe\" --background \"C:/Users/nacho/OneDrive/Desktop/F35C - Copy/F-35C.blend\" --python \"C:/Users/nacho/OneDrive/Desktop/F35C - Copy/animate_gear_v6.py\")"
+      "Bash(\"/c/Program Files/Blender Foundation/Blender 5.1/blender.exe\" --background \"C:/Users/nacho/OneDrive/Desktop/F35C - Copy/F-35C.blend\" --python \"C:/Users/nacho/OneDrive/Desktop/F35C - Copy/animate_gear_v6.py\")",
+      "Bash(node scripts/rig-f14-labeled.mjs)",
+      "Bash(mv F14v2.jsx F14A.jsx)",
+      "Bash(mv F14v2DebugScene.jsx F14ADebugScene.jsx)",
+      "Bash(mv F14v2DebugHinges.jsx F14ADebugHinges.jsx)",
+      "Bash(rm -v F14.jsx F14IranTestScene.jsx F14TestScene.jsx)",
+      "Bash(rm -rv src/app/f14 src/app/f14-test src/app/f14-v2)",
+      "Bash(mkdir -p src/app/f14a)",
+      "Bash(sed -i 's/F14v2DebugHinges/F14ADebugHinges/g; s/F14v2DebugScene/F14ADebugScene/g' src/components/F14ADebugScene.jsx)",
+      "Bash(sed -i 's/from \"\\\\.\\\\/F14v2\"/from \"\\\\.\\\\/F14A\"/g; s/import F14v2 from/import F14A from/g; s/<F14v2\\\\b/<F14A/g; s/<\\\\/F14v2>/<\\\\/F14A>/g' src/components/F14ADebugScene.jsx)",
+      "Bash(sed -i 's/export default function F14v2\\\\b/export default function F14A/g; s/\\\\[F14v2\\\\]/[F14A]/g; s/\\\\[F14v2 /[F14A /g; s/F14v2 /F14A /g; s/F14v2$/F14A/g' src/components/F14A.jsx)",
+      "Bash(sed -i 's/F14v2DebugScene/F14ADebugScene/g; s/F14v2/F14A/g' src/components/F14ADebugHinges.jsx)",
+      "Bash(mv F14A.jsx F14AIran.jsx)",
+      "Bash(mv F14ADebugScene.jsx F14AIranDebugScene.jsx)",
+      "Bash(mv F14ADebugHinges.jsx F14AIranDebugHinges.jsx)",
+      "Bash(node scripts/inspect_materials.mjs)",
+      "Bash(node scripts/diag_overlap.mjs)",
+      "Bash(node scripts/diag_uvs.mjs)",
+      "Bash(node -e ' *)"
     ]
   }
 }
