@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Mapbox tiles pre-descargados (~180 MB)
+/public/tiles/

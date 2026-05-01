@@ -62,7 +62,7 @@ export const HINGE_DEFAULTS = () => [
 ];
 
 // Rango de gearDown donde cada bisagra se aplica (phase).
-const PHASE_RANGES = [
+export const PHASE_RANGES = [
   [0.00, 0.20], [0.00, 0.20],   // 1-2: nose bay doors grandes
   [0.20, 0.40], [0.20, 0.40],   // 3-4: nose bay doors chicas
   [0.40, 1.00], [0.40, 1.00],   // 5-6: nose struts

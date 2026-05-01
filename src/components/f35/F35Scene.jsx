@@ -3,14 +3,17 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Sky, useGLTF } from "@react-three/drei";
+import { EffectComposer } from "@react-three/postprocessing";
+import { HeatShimmerEffect } from "../common/HeatShimmerEffect";
 import * as THREE from "three";
 
 import F35 from "./F35";
 import F35C from "../f35c/F35C";
 import F14AIran from "../f14a-iran/F14AIran";
 import { HINGE_DEFAULTS as F14_HINGE_DEFAULTS } from "../f14a-iran/F14AIranDebugHinges";
-import GulfReferenceTerrain from "../terrain/GulfReferenceTerrain";
 import GulfFallbackTerrain from "../terrain/GulfFallbackTerrain";
+import OrmuzTerrain from "../terrain/OrmuzTerrain";
+import GulfInfiniteWater from "../terrain/GulfInfiniteWater";
 
 useGLTF.preload("/f-35a.glb");
 
@@ -18,11 +21,13 @@ useGLTF.preload("/f-35a.glb");
 // Para agregar un nuevo modelo: importarlo arriba y añadir una entrada aquí.
 
 export const PLANE_MODELS = {
+  // Todos los modelos a scale=1 (tamaño nativo del GLB — los GLBs estan
+  // pre-escalados al ~36% del tamano real del avion).
   F35A: {
     label:            "F-35A",
     Component:        F35,
-    scale:            0.36,
-    position:         [0, -1, 0],
+    scale:            1,
+    position:         [0, 0.2, 0],
     rotation:         [0,  0, 0],
     extraProps:       { highlightRearWheelHeuristic: true },
     supportsGear:     true,
@@ -31,8 +36,11 @@ export const PLANE_MODELS = {
   F35C: {
     label:            "F-35C",
     Component:        F35C,
-    scale:            0.36,
-    position:         [0, -1, 0],
+    scale:            1,
+    // Calibrado por bbox: el GLB nativo tiene su origen 1.48m a la derecha del
+    // centro geométrico del avión y el fondo de los meshes a 0.6m sobre el origin.
+    // X = -1.48 centra fuselage en eje pista. Y = -1.30 baja las ruedas a SURFACE_Y=0.
+    position:         [-1.48, -2.2, 0],
     rotation:         [0,  0, 0],
     extraProps:       {},
     supportsGear:     true,
@@ -41,15 +49,27 @@ export const PLANE_MODELS = {
   F14A: {
     label:            "F-14A Iran",
     Component:        F14AIran,
-    scale:            0.36,
-    // F-14 fuselaje + gear ocupa mas alto que el F-35 → necesita position Y mayor
-    position:         [0, -0.4, 0],
+    scale:            1,
+    position:         [0, 1, 0],
     rotation:         [0,  0, 0],
     extraProps:       {
       hinges: F14_HINGE_DEFAULTS(),
+      // Piloto sentado en cabina (mismos valores tuneados que el debug scene)
+      pilotOffset: { x: 0, y: -0.88, z: 0.33 },
+      pilotTilt:   -19,
+      pilotScale:  1.37,
+      // Nozzle cerrada se mete hacia atras (+Y local = rear) 0.25m, slidea
+      // hacia adelante a medida que abre. Mismo valor que el debug scene.
+      nozzleClosedOffset: { x: 0, y: 0.25, z: 0 },
+      // Parametros del paracaidas (mismo tuneo que el debug scene)
+      chuteParams: {
+        shoulderOffset: 0.40, offsetX: 0.01, offsetY: 0.85, offsetZ: -0.02,
+        riserX: 0.06, riserSep: 0.045, riserWidth: 0.020, riserDepth: 0.006,
+        lineWidth: 0.003, confY: -2.61,
+      },
     },
     supportsGear:     false,
-    supportsNoseGear: false,
+    supportsNoseGear: true,   // tope ±35° aplicado dentro de F14AIran
   },
 };
 
@@ -78,6 +98,13 @@ const FLIGHT_MAX_SPEED  = 580;   // m/s (~1.13 Mach — limitado para el juego)
 const MAX_ALTITUDE      = 18288;
 const THROTTLE_RESPONSE = 0.55;  // respuesta del lever (más rápida que el motor)
 const RUDDER_RATE       = THREE.MathUtils.degToRad(60);
+
+// Aerodinámica F-35C — coeficientes derivados de geometría real
+const CL_ALPHA       = 5.5;   // pendiente de CL respecto a AoA (1/rad), típica de caza
+const STALL_AOA_RAD  = THREE.MathUtils.degToRad(16);   // AoA crítico
+const STALL_AOA_BAND = THREE.MathUtils.degToRad(8);    // ancho del rolloff post-stall
+const ASPECT_RATIO   = 2.74;  // span² / area = 13.05² / 62.1
+const OSWALD_E       = 0.78;  // factor de eficiencia de Oswald
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -167,8 +194,11 @@ function readControls(inputRef) {
 const SURFACE_Y = 0;
 
 function InfiniteGround() {
+  // Bien por debajo del agua (y=-2) y del seabed del WT terrain (~-77).
+  // Sirve solo como respaldo para evitar el "void" si el avión sale del
+  // dominio cubierto por agua/terrain (raro). No debería ser visible nunca.
   return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, SURFACE_Y - 0.5, 0]}>
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, SURFACE_Y - 100, 0]}>
       <planeGeometry args={[800000, 800000]} />
       <meshStandardMaterial color="#c8a46a" roughness={0.95} metalness={0} />
     </mesh>
@@ -250,7 +280,7 @@ function RunwayMesh() {
 // ─── Cámara ───────────────────────────────────────────────────────────────────
 
 const COCKPIT_PIVOT   = new THREE.Vector3(0, 0.12, 1.35);
-const CAM_ORBIT_R     = 13;
+const CAM_ORBIT_R     = 36;
 const CAM_YAW_LIMIT   = Math.PI * 2;
 const CAM_SPEED_YAW   = 2.4;
 const CAM_SPRING      = 3.5;
@@ -269,7 +299,7 @@ function SceneReady({ onReady }) {
 
 // ─── Controlador de vuelo ─────────────────────────────────────────────────────
 
-function FlightControllerBodyAxis({ inputRef, onHudChange, worldRef, onSceneReady, modelKey }) {
+function FlightControllerBodyAxis({ inputRef, onHudChange, worldRef, onSceneReady, modelKey, pilotEject }) {
   const { Component, scale, position, rotation, extraProps, supportsGear, supportsNoseGear } =
     PLANE_MODELS[modelKey] ?? PLANE_MODELS.F35A;
   const planeRef    = useRef(null);
@@ -283,6 +313,13 @@ function FlightControllerBodyAxis({ inputRef, onHudChange, worldRef, onSceneRead
   const _yawQ       = useRef(new THREE.Quaternion());
   const _targetQ    = useRef(new THREE.Quaternion());
   const _worldUp    = useRef(new THREE.Vector3(0, 1, 0));
+  const _accelVec   = useRef(new THREE.Vector3());
+  const _vDirVec    = useRef(new THREE.Vector3());
+  const _liftDirVec = useRef(new THREE.Vector3());
+  // Velocidad mundo del avión, expuesta al modelo para que el eject del piloto
+  // herede el momento (sin esto, en climb el piloto parece eyectarse "para abajo"
+  // porque el avión sigue subiendo y el piloto arranca con vel=0 en mundo).
+  const planeVelRef = useRef(new THREE.Vector3());
 
   const taxiSteerRef = useRef(0);
   const taxiSpeedRef = useRef(0);
@@ -296,14 +333,15 @@ function FlightControllerBodyAxis({ inputRef, onHudChange, worldRef, onSceneRead
   const sim = useRef({
     throttle:  0,              // posición del lever (0–1), responde rápido
     engineN:   ENGINE_IDLE_N,  // N1 real del motor (0–1), con inercia de turbina
-    speed:     0,
+    speed:     0,              // escalar (HUD + ground)
+    velocity:  new THREE.Vector3(),  // 3-D world-frame en aire (m/s)
     yaw:       0,
     altitude:  PLANE_BASE_Y,
     airborne:  false,
     hudCooldown: 0,
     cameraYaw:   0,
     cameraPitch: 0,
-    attitude:  new THREE.Quaternion(),
+    attitude:  new THREE.Quaternion(), // identidad — el ground branch slerpea hacia yaw=BND_RUNWAY_HEADING_RAD
   });
 
   useFrame((state, delta) => {
@@ -347,87 +385,154 @@ function FlightControllerBodyAxis({ inputRef, onHudChange, worldRef, onSceneRead
 
       s.yaw += taxiSteer * (0.16 + s.speed / GROUND_MAX_SPEED) * 0.55 * taxiAuthority * delta;
 
+      // Rotación de despegue conservadora — máx ~12° de cabeceo en tierra,
+      // típico de la maniobra de rotación real (más empuja al stall).
       const groundPitch = damp(
         planeRef.current.rotation.x,
-        -pitchInput * THREE.MathUtils.degToRad(28) * rotAuthority,
+        -pitchInput * THREE.MathUtils.degToRad(12) * rotAuthority,
         smooth
       );
       _targetQ.current.setFromEuler(new THREE.Euler(groundPitch, s.yaw, 0, "YXZ"));
       s.attitude.slerp(_targetQ.current, 1 - Math.exp(-12 * delta)).normalize();
       s.altitude = PLANE_BASE_Y;
 
-      if (s.speed > TAKEOFF_SPEED && pitchInput > 0.18) s.airborne = true;
+      if (s.speed > TAKEOFF_SPEED && pitchInput > 0.18) {
+        s.airborne = true;
+        // Forzar actitud a 10° nose-up en transición — sin esto, el slerp en
+        // ground branch nunca llega al pitch deseado antes del trigger y el
+        // avión despega con AoA insuficiente, vuelve al piso y rebota.
+        const e = new THREE.Euler().setFromQuaternion(s.attitude, "YXZ");
+        e.x = -THREE.MathUtils.degToRad(10);
+        s.attitude.setFromEuler(e).normalize();
+        _fwdVec.current.set(0, 0, 1).applyQuaternion(s.attitude).normalize();
+        s.velocity.copy(_fwdVec.current).multiplyScalar(s.speed);
+        // Boost de altitud inicial para alejarnos del piso y dar tiempo a que
+        // el AoA suba antes de que la condición de touchdown reaccione.
+        s.altitude = PLANE_BASE_Y + 0.5;
+      }
+
+      // Translación tierra → mundo (escalar a lo largo de fwd)
+      _fwdVec.current.set(0, 0, 1).applyQuaternion(s.attitude).normalize();
+      globalX.current += _fwdVec.current.x * s.speed * delta;
+      globalZ.current += _fwdVec.current.z * s.speed * delta;
 
     } else {
-      // ── Controles del piloto ─────────────────────────────────────────────
-      const pitchRate = clamp(14 * 9.81 / Math.max(s.speed, TAKEOFF_SPEED), 0.3, 1.8);
+      // ── Controles del piloto: rotación de actitud ─────────────────────────
+      // pitch rate limitada por g-load (9g op. F-35) — a baja velocidad alto rate,
+      // a alta velocidad bajo rate (radio de giro mínimo). Clamp realista.
+      const speedNow  = s.velocity.length();
+      const pitchRate = clamp(9 * 9.81 / Math.max(speedNow, TAKEOFF_SPEED), 0.2, 1.0);
       const rollRate  = THREE.MathUtils.degToRad(180);
 
       _fwdVec.current.set(0, 0, 1).applyQuaternion(s.attitude).normalize();
       _rightVec.current.set(1, 0, 0).applyQuaternion(s.attitude).normalize();
+      _upVec.current.set(0, 1, 0).applyQuaternion(s.attitude).normalize();
 
-      _pitchQ.current.setFromAxisAngle(_rightVec.current, -pitchInput * pitchRate * delta);
+      // Alpha limiter (estilo FBW F-35): si el AoA actual se acerca al stall,
+      // recorta el input de pitch hacia arriba a 0. Sin esto, mantener Space
+      // pulsado hace over-rotate → AoA past stall → CL collapsa → no despega.
+      let aoaNow = 0;
+      if (speedNow > 1) {
+        const vF = s.velocity.dot(_fwdVec.current);
+        const vU = s.velocity.dot(_upVec.current);
+        aoaNow = -Math.atan2(vU, vF);
+      }
+      const ALPHA_LIMIT = STALL_AOA_RAD - THREE.MathUtils.degToRad(2); // soft 14°
+      let limitedPitch = pitchInput;
+      if (pitchInput > 0) {
+        const headroom = clamp((ALPHA_LIMIT - aoaNow) / THREE.MathUtils.degToRad(6), 0, 1);
+        limitedPitch *= headroom;
+      } else if (pitchInput < 0) {
+        const headroom = clamp((ALPHA_LIMIT + aoaNow) / THREE.MathUtils.degToRad(6), 0, 1);
+        limitedPitch *= headroom;
+      }
+
+      _pitchQ.current.setFromAxisAngle(_rightVec.current, -limitedPitch * pitchRate * delta);
       s.attitude.premultiply(_pitchQ.current);
 
       _rollQ.current.setFromAxisAngle(_fwdVec.current, -flightSteer * rollRate * delta);
       s.attitude.premultiply(_rollQ.current);
-      s.attitude.normalize();
 
-      // ── Pérdida aerodinámica (stall) ─────────────────────────────────────
-      // Ocurre cuando la velocidad cae bajo STALL_SPEED, o cuando el piloto
-      // tira demasiado de la nariz a baja velocidad (ángulo de ataque excesivo).
-      // Efecto: la nariz baja sola hacia la gravedad hasta que la velocidad se recupera.
-      _rightVec.current.set(1, 0, 0).applyQuaternion(s.attitude).normalize();
-      const aoaOverload   = Math.max(pitchInput, 0) *
-        clamp(1 - s.speed / (TAKEOFF_SPEED * 1.4), 0, 1);
-      const stallFraction = clamp(
-        (1 - s.speed / STALL_SPEED) + aoaOverload * 1.5,
-        0, 1
-      );
-      if (stallFraction > 0.05) {
-        // Momento de cabeceo negativo — la nariz baja hacia la gravedad
-        _pitchQ.current.setFromAxisAngle(_rightVec.current, stallFraction * 1.2 * delta);
-        s.attitude.premultiply(_pitchQ.current);
-      }
-
-      // ── Timón de dirección (guiñada) ─────────────────────────────────────
-      // L1 / KeyQ = guiñada izquierda · R1 / KeyE = guiñada derecha
       _yawQ.current.setFromAxisAngle(_worldUp.current, -ctrl.rudder * RUDDER_RATE * delta);
       s.attitude.premultiply(_yawQ.current);
       s.attitude.normalize();
 
+      // Re-derivar ejes del cuerpo después de las rotaciones
       _fwdVec.current.set(0, 0, 1).applyQuaternion(s.attitude).normalize();
+      _rightVec.current.set(1, 0, 0).applyQuaternion(s.attitude).normalize();
+      _upVec.current.set(0, 1, 0).applyQuaternion(s.attitude).normalize();
 
-      // ── Física de velocidad: F = Empuje − Arrastre ± Gravedad sobre trayectoria ──
-      // Densidad del aire (ISA simplificado)
-      const rho          = 1.225 * Math.exp(-s.altitude / 8500);
-      const q            = 0.5 * rho * s.speed * s.speed;
-      const dragAccel    = q * CD_AERO * WING_AREA / MASS;
-      // Empuje basado en N1 real del motor (nunca cae a 0 gracias al idle)
-      const thrustAccel  = s.engineN * MAX_THRUST / MASS;
-      // Componente de la gravedad sobre el eje de vuelo:
-      //   nariz arriba  → frena  (fwdVec.y > 0)
-      //   nariz abajo   → acelera (fwdVec.y < 0)
-      const gravAlongFwd = -9.81 * _fwdVec.current.y;
-      s.speed = clamp(s.speed + (thrustAccel - dragAccel + gravAlongFwd) * delta, 0, FLIGHT_MAX_SPEED);
+      // ── Aerodinámica 3-D real ─────────────────────────────────────────────
+      // F = empuje (fwd) + drag (-vDir) + lift (perp. a vel) + gravedad (-y)
+      // Lift y drag dependen de presión dinámica q = ½ρv² · CL depende del AoA real
+      // (ángulo entre fwd y vector velocidad), no de la velocidad — ese era el bug.
+      const speed = s.velocity.length();
+      const rho   = 1.225 * Math.exp(-s.altitude / 8500);
+      const q     = 0.5 * rho * speed * speed;
 
-      // ── Altitud: sustentación aerodinámica real ───────────────────────────
-      // L = ½ ρ v² CL S  — CL varía linealmente con AoA hasta CL_MAX
-      // En vuelo recto nivelado L = W (peso), el piloto controla el AoA con pitch.
-      // Aquí usamos un CL efectivo que crece con la velocidad (vuelo nivelado nominal)
-      // y se reduce con el stall.
-      const clEff        = CL_MAX * clamp(s.speed / TAKEOFF_SPEED, 0, 1) * (1 - stallFraction * 0.85);
-      const lift         = q * clEff * WING_AREA;          // N
-      const weight       = MASS * 9.81;                    // N
-      // Aceleración neta vertical (positivo = sube): (L - W) / MASS
-      const vertAccel    = (lift - weight) / MASS;
-      const gravity      = -vertAccel;  // alias para reutilizar cálculo de altitud
+      // AoA: ángulo entre nariz del avión (fwd) y vector velocidad real, medido
+      // en plano de cabeceo. >0 cuando la nariz apunta arriba del vector de vuelo.
+      let aoa = 0;
+      if (speed > 1) {
+        const vFwd = s.velocity.dot(_fwdVec.current);
+        const vUp  = s.velocity.dot(_upVec.current);
+        aoa = -Math.atan2(vUp, vFwd);
+      }
 
-      s.altitude += _fwdVec.current.y * s.speed * delta - gravity * delta;
-      s.altitude  = clamp(s.altitude, PLANE_BASE_Y, MAX_ALTITUDE);
+      // Coef. sustentación: lineal con AoA · stall por encima del crítico
+      let CL = CL_ALPHA * aoa;
+      let stallFraction = 0;
+      if (Math.abs(aoa) > STALL_AOA_RAD) {
+        stallFraction = clamp((Math.abs(aoa) - STALL_AOA_RAD) / STALL_AOA_BAND, 0, 1);
+        CL *= (1 - stallFraction * 0.85);
+      }
+      CL = clamp(CL, -CL_MAX, CL_MAX);
 
-      if (s.altitude <= PLANE_BASE_Y) {
+      // Coef. drag total = parásito + inducido (CL² / (π·AR·e))
+      const CD_INDUCED = (CL * CL) / (Math.PI * ASPECT_RATIO * OSWALD_E);
+      const CD_TOTAL   = CD_AERO + CD_INDUCED;
+
+      const thrustN = s.engineN * MAX_THRUST;
+      const dragN   = q * CD_TOTAL * WING_AREA;
+      const liftN   = q * CL       * WING_AREA;
+
+      // Acumular fuerzas en aceleración (en m/s²)
+      _accelVec.current.set(0, -9.81, 0);                                   // gravedad
+      _accelVec.current.addScaledVector(_fwdVec.current, thrustN / MASS);    // empuje
+
+      if (speed > 0.1) {
+        _vDirVec.current.copy(s.velocity).divideScalar(speed);
+        _accelVec.current.addScaledVector(_vDirVec.current, -dragN / MASS); // drag
+        // Lift: perpendicular al vector velocidad, en el plano (vel, planeUp).
+        // vDir × right (regla mano derecha) → +Y mundo cuando avión nivelado.
+        // Si era right × vDir, lift apuntaba hacia abajo (bug que hacía que
+        // el avión nunca despegara aunque CL fuera correcto).
+        _liftDirVec.current.crossVectors(_vDirVec.current, _rightVec.current).normalize();
+        _accelVec.current.addScaledVector(_liftDirVec.current, liftN / MASS);
+      }
+
+      // Integrar velocidad
+      s.velocity.addScaledVector(_accelVec.current, delta);
+      const newSpeed = s.velocity.length();
+      if (newSpeed > FLIGHT_MAX_SPEED) {
+        s.velocity.multiplyScalar(FLIGHT_MAX_SPEED / newSpeed);
+      }
+
+      // Integrar posición (mundo via floating origin + altitud)
+      globalX.current += s.velocity.x * delta;
+      s.altitude     += s.velocity.y * delta;
+      globalZ.current += s.velocity.z * delta;
+      s.altitude      = clamp(s.altitude, PLANE_BASE_Y, MAX_ALTITUDE);
+
+      // Velocidad escalar para HUD / superficies de control
+      s.speed = newSpeed > FLIGHT_MAX_SPEED ? FLIGHT_MAX_SPEED : newSpeed;
+
+      // Touchdown: requiere descenso real (no rozar). Sin esto el clamp de
+      // altitud a PLANE_BASE_Y dispara touchdown frame-a-frame y rebotamos.
+      if (s.altitude <= PLANE_BASE_Y && s.velocity.y < -1.0) {
         s.airborne = false;
+        s.speed    = Math.hypot(s.velocity.x, s.velocity.z);
+        s.velocity.set(0, 0, 0);
         const e = new THREE.Euler().setFromQuaternion(s.attitude, "YXZ");
         s.yaw = wrapAngle(e.y);
         _targetQ.current.setFromEuler(new THREE.Euler(0, s.yaw, 0, "YXZ"));
@@ -436,8 +541,6 @@ function FlightControllerBodyAxis({ inputRef, onHudChange, worldRef, onSceneRead
     }
 
     _fwdVec.current.set(0, 0, 1).applyQuaternion(s.attitude).normalize();
-    globalX.current += _fwdVec.current.x * s.speed * delta;
-    globalZ.current += _fwdVec.current.z * s.speed * delta;
 
     planeRef.current.position.set(0, s.altitude, 0);
     planeRef.current.quaternion.copy(s.attitude);
@@ -446,6 +549,10 @@ function FlightControllerBodyAxis({ inputRef, onHudChange, worldRef, onSceneRead
       worldRef.current.position.x = -globalX.current;
       worldRef.current.position.z = -globalZ.current;
     }
+
+    // Exportar velocidad mundo del avión al modelo (para que el eject herede el momento)
+    if (s.airborne) planeVelRef.current.copy(s.velocity);
+    else            planeVelRef.current.set(0, 0, 0);
 
     s.cameraYaw = clamp(s.cameraYaw + ctrl.cameraX * CAM_SPEED_YAW * delta, -CAM_YAW_LIMIT, CAM_YAW_LIMIT);
     if (Math.abs(ctrl.cameraX) < 0.08) {
@@ -499,6 +606,13 @@ function FlightControllerBodyAxis({ inputRef, onHudChange, worldRef, onSceneRead
     }
   });
 
+  // DEBUG: exponer planeRef para inspección de bbox
+  useEffect(() => {
+    if (typeof window !== "undefined" && planeRef.current) {
+      window.__planeRef = planeRef.current;
+    }
+  });
+
   return (
     <group ref={planeRef} position={[0, PLANE_BASE_Y, 0]}>
       <Suspense fallback={null}>
@@ -510,6 +624,8 @@ function FlightControllerBodyAxis({ inputRef, onHudChange, worldRef, onSceneRead
           noseGearSteerRef={supportsNoseGear ? taxiSteerRef : undefined}
           taxiSpeedRef={taxiSpeedRef}
           controlsRef={controlsRef}
+          pilotEject={pilotEject}
+          planeVelRef={planeVelRef}
           debug={false}
           {...extraProps}
         />
@@ -555,7 +671,21 @@ export default function F35Scene() {
   const worldRef = useRef();
   const [hud, setHud] = useState({ throttle: 0, engineN: ENGINE_IDLE_N, speed: 0, altitude: 0, airborne: false, gamepadConnected: false });
   const [visible, setVisible] = useState(false);
-  const [modelKey, setModelKey] = useState("F35C");
+  const [modelKey, setModelKey] = useState("F14A");
+  const [pilotEject, setPilotEject] = useState(false);
+  const [prevModelKey, setPrevModelKey] = useState(modelKey);
+  // Reset eject al cambiar de modelo — pattern de "reset state on prop change"
+  // segun docs de React (durante render, no en effect).
+  if (prevModelKey !== modelKey) {
+    setPrevModelKey(modelKey);
+    setPilotEject(false);
+  }
+  // Eyectar con KeyJ.
+  useEffect(() => {
+    const onDown = e => { if (e.code === "KeyJ") setPilotEject(true); };
+    window.addEventListener("keydown", onDown);
+    return () => window.removeEventListener("keydown", onDown);
+  }, []);
 
   return (
     <main style={{ width: "100vw", height: "100vh", background: "#0b1016" }}>
@@ -586,10 +716,13 @@ export default function F35Scene() {
         style={{ opacity: visible ? 1 : 0, transition: "opacity 0.3s" }}
         camera={{ position: INITIAL_CAMERA_POS, fov: 52, near: 0.5, far: 200000 }}
         shadows={{ type: THREE.PCFShadowMap }}
+        gl={{ logarithmicDepthBuffer: true, antialias: true }}
         onCreated={({ camera }) => { camera.lookAt(...INITIAL_CAMERA_TARGET); }}
       >
         <color attach="background" args={["#87ceeb"]} />
-        <fog   attach="fog"        args={["#b8d8ea", 3000, 120000]} />
+        {/* FogExp2 con densidad baja → perspectiva atmosférica DCS-like
+            sin tapar el horizonte. ~50 % visibilidad a 14 km. */}
+        <fogExp2 attach="fog" args={["#b8d8ea", 0.00005]} />
 
         <ambientLight intensity={1.0} />
         <hemisphereLight args={["#ddeeff", "#c8aa6a", 1.3]} />
@@ -608,11 +741,28 @@ export default function F35Scene() {
         {/* Mundo geográfico — se translada con el origen flotante */}
         <group ref={worldRef} position={[0, 0, INITIAL_SPAWN_Z]}>
           {MAPBOX_TOKEN
-            ? <GulfReferenceTerrain token={MAPBOX_TOKEN} groundY={SURFACE_Y} />
+            ? <OrmuzTerrain token={MAPBOX_TOKEN} groundY={SURFACE_Y} />
             : <GulfFallbackTerrain groundY={SURFACE_Y} />
           }
           <RunwayMesh />
+          {/* DEBUG: marcador rojo de la pista de Bandar Abbas (OIKB).
+              Heading 030° (NNE), 4000m × 60m. */}
+          <mesh
+            rotation={[-Math.PI / 2, 0, -(25 * Math.PI) / 180]}
+            position={[+150, SURFACE_Y + 1.0, +109]}
+          >
+            <planeGeometry args={[60, 4000]} />
+            <meshBasicMaterial color={0xff0033} transparent opacity={0.55} />
+          </mesh>
         </group>
+
+        {/* Agua infinita del Golfo — plano 200×200 km con shader de Water
+            (three-stdlib): reflexión planar + Fresnel + normales animadas.
+            Fuera de worldRef → siempre centrado en el avión, no se "termina"
+            cuando volás lejos. Donde el WT terrain sube sobre y=0, el terreno
+            tapa el agua; donde está plano (mar real), el agua es visible. */}
+        {/* DEBUG: agua deshabilitada temporalmente para ver el satelital crudo */}
+        {/* <GulfInfiniteWater y={SURFACE_Y - 8.0} sunDirection={[80, 150, -60]} /> */}
 
         <FlightControllerBodyAxis
           inputRef={inputRef}
@@ -620,7 +770,12 @@ export default function F35Scene() {
           worldRef={worldRef}
           onSceneReady={() => setVisible(true)}
           modelKey={modelKey}
+          pilotEject={pilotEject}
         />
+
+        <EffectComposer multisampling={0}>
+          <HeatShimmerEffect strength={1} />
+        </EffectComposer>
       </Canvas>
     </main>
   );

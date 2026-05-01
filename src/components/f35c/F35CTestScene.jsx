@@ -375,7 +375,7 @@ export default function F35CTestScene() {
               lastHighlighted.current = hit;
             }
           }}>
-            <F35C scale={1} position={[0, 0, 0]} rotation={[0, 0, 0]} gearDown={gearDown} canopyOpen={canopyOpen} weaponBayOpen={weaponBayOpen} hookDown={hookDown} pitch={pitch} roll={roll} flap={flap} aileron={aileron} leadingFlap={leadingFlap} rudder={rudder} wingFold={wingFold} throttle={throttle} hiddenWeapons={hiddenWeapons} debugAnim={debugAnim} debugProgress={debugProgress} eject={eject} ejectTriggerRef={ejectTriggerRef} resetEjectTriggerRef={resetEjectTriggerRef} chuteParams={chuteParams} taxiSpeedRef={taxiSpeedRef} rearWheelWobbleRef={rearWheelWobbleRef} rearWheelLiftAmount={rearWheelLiftAmount} debugRearWheelAxes={true} />
+            <F35C scale={1} position={[0, 0, 0]} rotation={[0, 0, 0]} gearDown={gearDown} canopyOpen={canopyOpen} weaponBayOpen={weaponBayOpen} hookDown={hookDown} pitch={pitch} roll={roll} flap={flap} aileron={aileron} leadingFlap={leadingFlap} rudder={rudder} wingFold={wingFold} throttle={throttle} hiddenWeapons={hiddenWeapons} debugAnim={debugAnim} debugProgress={debugProgress} eject={eject} ejectTriggerRef={ejectTriggerRef} resetEjectTriggerRef={resetEjectTriggerRef} chuteParams={chuteParams} taxiSpeedRef={taxiSpeedRef} rearWheelWobbleRef={rearWheelWobbleRef} rearWheelLiftAmount={rearWheelLiftAmount} debugRearWheelAxes={false} />
           </group>
         </Suspense>
 

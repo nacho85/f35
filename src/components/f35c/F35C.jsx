@@ -845,6 +845,7 @@ export default function F35C({
   eject                = false, // true → dispara secuencia de eyección
   ejectTriggerRef      = null,  // si se provee, se llena con () => trigger() para disparo síncrono
   resetEjectTriggerRef = null,  // si se provee, se llena con () => reset()
+  planeVelRef          = null,  // Vector3 mundo (m/s); piloto/asiento heredan momento al eyectar
   pilotPose    = null,  // { elbow, shoulderIn, shoulderFwd, forearmOut, forearmDown, forearmZ, forearmRoll, torso, kneeExt }
   pilotOffset  = null,  // { x, y, z, tilt, scale }
   chuteParams  = null,  // { shoulderOffset, riserX, riserSep, riserWidth, confY }
@@ -1053,9 +1054,17 @@ export default function F35C({
     es.seatSep  = false;
     es.chuteT   = 0;
     es.pilotPos.copy(initPilotPos);
-    es.pilotVel.set(0, 0, 0);   // velocidad inicial cero — las fases la construyen
     es.seatPos.copy(initSeatPos);
-    es.seatVel.set(0, 0, 0);
+    // Heredar momento del avión (Newton 1ª ley). Sin esto, en climb el piloto
+    // arranca con vel=0 mientras el avión sigue subiendo → parece "eyectarse hacia abajo".
+    const pv = planeVelRef?.current;
+    if (pv) {
+      es.pilotVel.copy(pv);
+      es.seatVel.copy(pv);
+    } else {
+      es.pilotVel.set(0, 0, 0);
+      es.seatVel.set(0, 0, 0);
+    }
   };
 
   useEffect(() => {
@@ -1079,15 +1088,23 @@ export default function F35C({
       const pos = geo.attributes.position;
       // Guard: si pos no existe, la geometría ya fue reemplazada (StrictMode double-invoke)
       if (pos) {
+      // Calcular X de cada vértice en el espacio LOCAL del F35C (groupRef),
+      // ignorando scale/position/rotation del componente outer.
+      // WEAPON_ZONES.minX/maxX están calibrados en el espacio del modelo nativo
+      // del GLB (es decir, asumiendo scale=1, sin offsets en el componente).
+      // Si usamos worldMatrix directo, cualquier scale!=1 o position.x!=0 del
+      // outer group corrompe los thresholds y los triángulos no caen en zonas.
       wepons.updateWorldMatrix(true, false);
-      const wmat    = wepons.matrixWorld;
+      groupRef.current?.updateWorldMatrix(true, false);
+      const f35cInverse = new (wepons.matrixWorld.constructor)();
+      if (groupRef.current) f35cInverse.copy(groupRef.current.matrixWorld).invert();
+      const wepToF35cLocal = wepons.matrixWorld.clone().premultiply(f35cInverse);
       const origMat = Array.isArray(wepons.material) ? wepons.material[0] : wepons.material;
 
-      // Pre-calcular world X por vértice
       const tmp    = new Vector3();
       const worldX = new Float32Array(pos.count);
       for (let i = 0; i < pos.count; i++) {
-        tmp.fromBufferAttribute(pos, i).applyMatrix4(wmat);
+        tmp.fromBufferAttribute(pos, i).applyMatrix4(wepToF35cLocal);
         worldX[i] = tmp.x;
       }
 
@@ -1123,10 +1140,11 @@ export default function F35C({
         if (geo.attributes.uv)     subGeo.setAttribute("uv",     geo.attributes.uv);
         subGeo.setIndex(weaponIdxs[w]);
 
+        // Usar material original del GLB (sin override de color de debug).
+        // Los `zone.color` siguen en WEAPON_ZONES por si hace falta volver a
+        // identificar zonas durante desarrollo.
         const mat = origMat.clone();
-        mat.color.setHex(zone.color);
-        mat.vertexColors = false;
-        mat.needsUpdate  = true;
+        mat.needsUpdate = true;
 
         const mesh = new Mesh(subGeo, mat);
         mesh.name = `Weapon_${zone.id}`;
@@ -1164,41 +1182,72 @@ export default function F35C({
     // ── Pintura de cubiertas y llantas ────────────────────────────────────────
     // Colores llamativos para identificación:
     //   ROJO    = cubierta/goma (tread)
-    //   AMARILLO = llanta/rim
-    //   AZUL    = eje/strut
-    const strutMat = new MeshStandardMaterial({ color: 0x0088ff, roughness: 0.4, metalness: 0.5 });
-
     // ── BODY040: split en runtime (L/axle/R) — sin tocar el GLB ──────────────
     const body040name = "F-35C-BODY040";
     const body040 = clonedScene.getObjectByName(body040name)
                  ?? clonedScene.getObjectByName("F-35C-BODY.040");
-    // PCA: encuentra el eigenvector más pequeño de la covarianza = eje del disco (axle direction exacto)
-    const wheelAxisPCA = (geo, forceNeg = false) => {
+    // PCA: axle = v1 × v2 (eigenvector mínimo de la covarianza, perpendicular al disco).
+    // Para un disco los dos eigenvalues del plano son ~iguales: la deflación matricial
+    // se vuelve numéricamente inestable y v2 absorbe componente del axle → wobble.
+    // Solución (igual que F14 main wheels): power iteration con Gram-Schmidt continuo
+    // contra v1 cada paso — ortogonalización exacta independiente de la separación de eigenvalues.
+    const wheelAxisPCA = (geo, forceNeg = false, filterStrut = false) => {
       const pos = geo.getAttribute('position');
       const n = pos.count;
       if (n < 3) return new Vector3(forceNeg ? -1 : 1, 0, 0);
       let cx=0,cy=0,cz=0;
       for(let i=0;i<n;i++){cx+=pos.getX(i);cy+=pos.getY(i);cz+=pos.getZ(i);}
       cx/=n; cy/=n; cz/=n;
-      let mxx=0,myy=0,mzz=0,mxy=0,mxz=0,myz=0;
+      const centered = new Float32Array(n*3);
       for(let i=0;i<n;i++){
-        const x=pos.getX(i)-cx, y=pos.getY(i)-cy, z=pos.getZ(i)-cz;
-        mxx+=x*x; myy+=y*y; mzz+=z*z; mxy+=x*y; mxz+=x*z; myz+=y*z;
+        centered[i*3]   = pos.getX(i)-cx;
+        centered[i*3+1] = pos.getY(i)-cy;
+        centered[i*3+2] = pos.getZ(i)-cz;
       }
-      const mv = ([a,b,c]) => [mxx*a+mxy*b+mxz*c, mxy*a+myy*b+myz*c, mxz*a+myz*b+mzz*c];
-      const nm = v => { const l=Math.sqrt(v[0]**2+v[1]**2+v[2]**2)||1; return v.map(x=>x/l); };
-      const dt = (a,b) => a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
-      // Eigenvector mayor (power iteration)
-      let v1 = nm([1,1,1]);
-      for(let i=0;i<60;i++) v1=nm(mv(v1));
-      const λ1 = dt(mv(v1),v1);
-      // Deflate y segundo eigenvector
-      const mv2 = ([a,b,c]) => { const r=mv([a,b,c]); const d=dt(v1,[a,b,c]); return [r[0]-λ1*d*v1[0],r[1]-λ1*d*v1[1],r[2]-λ1*d*v1[2]]; };
-      let v2 = nm([v1[1]-v1[2],v1[2]-v1[0],v1[0]-v1[1]]);
-      for(let i=0;i<60;i++) v2=nm(mv2(v2));
-      // Tercer eigenvector = producto vectorial (el más pequeño = axle)
-      const v3 = nm([v1[1]*v2[2]-v1[2]*v2[1], v1[2]*v2[0]-v1[0]*v2[2], v1[0]*v2[1]-v1[1]*v2[0]]);
-      const axis = new Vector3(v3[0],v3[1],v3[2]);
+      const computeAxle = (mask) => {
+        const piter = (start, perpTo) => {
+          const v = start.clone().normalize();
+          const acc = new Vector3();
+          for (let it = 0; it < 30; it++) {
+            acc.set(0,0,0);
+            for (let i = 0; i < n; i++) {
+              if (mask && !mask[i]) continue;
+              const x = centered[i*3], y = centered[i*3+1], z = centered[i*3+2];
+              const d = x*v.x + y*v.y + z*v.z;
+              acc.x += x*d; acc.y += y*d; acc.z += z*d;
+            }
+            if (perpTo) acc.sub(perpTo.clone().multiplyScalar(acc.dot(perpTo)));
+            if (acc.lengthSq() > 1e-10) v.copy(acc).normalize();
+          }
+          return v;
+        };
+        const v1 = piter(new Vector3(1, 0, 0), null);
+        const seed2 = Math.abs(v1.x) < 0.9 ? new Vector3(1, 0, 0) : new Vector3(0, 1, 0);
+        seed2.sub(v1.clone().multiplyScalar(seed2.dot(v1))).normalize();
+        const v2 = piter(seed2, v1);
+        return new Vector3().crossVectors(v1, v2).normalize();
+      };
+      // Pass 1: PCA sobre toda la geometría → axle aproximado
+      let axis = computeAxle(null);
+      // Pass 2 (filterStrut=true): quedarse SOLO con verts del rim externo
+      // (top 30% más alejados perpendicularmente al axle = el aro circular).
+      // El rim es simétrico alrededor del axle → su PCA da el axle EXACTO.
+      // El strut residual tiene d_perp variable y queda fuera de este filtro.
+      if (filterStrut) {
+        const dPerp = new Float32Array(n);
+        for (let i = 0; i < n; i++) {
+          const x = centered[i*3], y = centered[i*3+1], z = centered[i*3+2];
+          const dPar = x*axis.x + y*axis.y + z*axis.z;
+          const px = x - dPar*axis.x, py = y - dPar*axis.y, pz = z - dPar*axis.z;
+          dPerp[i] = Math.hypot(px, py, pz);
+        }
+        const sortedR = Float32Array.from(dPerp).sort();
+        const rThreshold = sortedR[Math.floor(n * 0.70)]; // top 30% más radiales = rim
+        const mask = new Uint8Array(n);
+        let kept = 0;
+        for (let i = 0; i < n; i++) if (dPerp[i] >= rThreshold) { mask[i] = 1; kept++; }
+        if (kept >= 10) axis = computeAxle(mask);
+      }
       if (forceNeg && axis.x > 0) axis.negate();
       if (!forceNeg && axis.x < 0) axis.negate();
       return axis;
@@ -1226,13 +1275,14 @@ export default function F35C({
     } else if (body040 && body040.visible) {
       const split = splitMeshByIslandX(body040, { leftMax: 1.65, rightMin: 1.72 });
       if (split) {
-        const axleMesh = new Mesh(split.axle, strutMat.clone());
+        const body040OrigMat = Array.isArray(body040.material) ? body040.material[0].clone() : body040.material.clone();
+        const axleMesh = new Mesh(split.axle, body040OrigMat);
         axleMesh.name = `${body040name}_axle`;
         axleMesh.position.copy(body040.position);
         axleMesh.quaternion.copy(body040.quaternion);
         axleMesh.scale.copy(body040.scale);
 
-        const wheelMat = new MeshStandardMaterial({ color: 0xff1a1a, roughness: 0.8, metalness: 0.0 });
+        const wheelMat = Array.isArray(body040.material) ? body040.material[0].clone() : body040.material.clone();
         clonedScene.updateMatrixWorld(true);
         const applyWheelByNormal = (geo, label) => {
           // Paso 1: normals sobre geometría original
@@ -1315,28 +1365,94 @@ export default function F35C({
     }
 
     const rearWheelDefs = [
-      { name: "F-35C-BODY055", dotName: "F-35C-BODY.055", axis: 'x', cut: 0.45,  wheelBelow: true  },
-      { name: "F-35C-BODY056", dotName: "F-35C-BODY.056", axis: 'x', cut: 2.57,  wheelBelow: false },
+      { name: "F-35C-BODY055", dotName: "F-35C-BODY.055", axis: 'x', cut: 0.45,  wheelBelow: true,  percentileCenter: false },
+      // BODY056: el corte deja strut residual que sesga el bbox midpoint → wheelMesh
+      // descentrado → wobble. Centro = bbox PERCENTILE 5-95% (descarta outliers del strut).
+      { name: "F-35C-BODY056", dotName: "F-35C-BODY.056", axis: 'x', cut: 2.57,  wheelBelow: false, percentileCenter: true },
     ];
-    for (const { name, dotName, axis, cut, wheelBelow } of rearWheelDefs) {
+    for (const { name, dotName, axis, cut, wheelBelow, percentileCenter } of rearWheelDefs) {
       const obj = clonedScene.getObjectByName(name) ?? clonedScene.getObjectByName(dotName);
       if (!obj) { console.warn(`[F35C] no encontrado: ${name}`); continue; }
       const existingWheel = obj.parent?.children.find(c => c.name === `${name}_wheel`);
       if (existingWheel) {
         // Ya spliteado — re-registrar con eje PCA
-        const rearAxis = wheelAxisPCA(existingWheel.geometry, true);
-        if (debugRearWheelAxes && !existingWheel.getObjectByName(`${name}_axisDebug`)) {
-          const axisLine = createAxisDebugLine(rearAxis, name.endsWith("055") ? 0x00ffff : 0xffaa00);
+        const rearAxis = wheelAxisPCA(existingWheel.geometry, true, percentileCenter);
+        // Solo 055 dibuja desde acá; 056 lo hace el bloque post-loop con axle espejado
+        if (debugRearWheelAxes && name.endsWith("055") && existingWheel.parent
+            && !existingWheel.parent.children.find(c => c.name === `${name}_axisDebug`)) {
+          const axisInParent = rearAxis.clone().applyQuaternion(existingWheel.quaternion);
+          const axisLine = createAxisDebugLine(axisInParent, 0x00ffff);
           axisLine.name = `${name}_axisDebug`;
-          existingWheel.add(axisLine);
+          axisLine.position.copy(existingWheel.position);
+          existingWheel.parent.add(axisLine);
         }
         wheelSpinRef.current.push({ pivot: existingWheel, axis: rearAxis, baseAxis: rearAxis.clone(), isRearWheel: true });
         continue;
       }
       const split = splitMeshTwoWay(obj, axis, cut);
       if (!split) { console.warn(`[F35C] split falló: ${name}`); continue; }
-      const wheelGeo = wheelBelow ? split.below : split.above;
+      let wheelGeo = wheelBelow ? split.below : split.above;
       const strutGeo = wheelBelow ? split.above : split.below;
+
+      // Para 056: aislar la rueda por componente conectado más grande (descarta strut
+      // residual que el split por X dejó pegado a la rueda).
+      if (percentileCenter) {
+        const wp = wheelGeo.getAttribute('position');
+        const total = wp.count;
+        if (total >= 9) {
+          const triCount = total / 3;
+          const quantize = v => Math.round(v * 1000);
+          const buckets = new Map();
+          for (let t = 0; t < triCount; t++) {
+            for (let v = 0; v < 3; v++) {
+              const i = t*3 + v;
+              const k = `${quantize(wp.getX(i))}:${quantize(wp.getY(i))}:${quantize(wp.getZ(i))}`;
+              if (!buckets.has(k)) buckets.set(k, []);
+              buckets.get(k).push(t);
+            }
+          }
+          const adj = Array.from({length: triCount}, () => new Set());
+          for (const tris of buckets.values()) {
+            for (let i = 0; i < tris.length; i++)
+              for (let j = i+1; j < tris.length; j++) {
+                adj[tris[i]].add(tris[j]); adj[tris[j]].add(tris[i]);
+              }
+          }
+          const visited = new Array(triCount).fill(false);
+          const islands = [];
+          for (let i = 0; i < triCount; i++) {
+            if (visited[i]) continue;
+            const stack = [i], isl = [];
+            visited[i] = true;
+            while (stack.length) {
+              const c = stack.pop(); isl.push(c);
+              for (const nb of adj[c]) if (!visited[nb]) { visited[nb] = true; stack.push(nb); }
+            }
+            islands.push(isl);
+          }
+          if (islands.length > 1) {
+            islands.sort((a, b) => b.length - a.length);
+            const biggest = new Set(islands[0]);
+            const oldNml = wheelGeo.getAttribute('normal');
+            const oldUv = wheelGeo.getAttribute('uv');
+            const newPos = [], newNml = [], newUv = [];
+            for (const t of biggest) {
+              for (let v = 0; v < 3; v++) {
+                const i = t*3 + v;
+                newPos.push(wp.getX(i), wp.getY(i), wp.getZ(i));
+                if (oldNml) newNml.push(oldNml.getX(i), oldNml.getY(i), oldNml.getZ(i));
+                if (oldUv) newUv.push(oldUv.getX(i), oldUv.getY(i));
+              }
+            }
+            const ng = new BufferGeometry();
+            ng.setAttribute('position', new Float32BufferAttribute(newPos, 3));
+            if (newNml.length) ng.setAttribute('normal', new Float32BufferAttribute(newNml, 3));
+            if (newUv.length) ng.setAttribute('uv', new Float32BufferAttribute(newUv, 2));
+            console.log(`[F35C] ${name} keepBiggestIsland: ${islands.length} islas → ${islands[0].length}/${triCount} tris`);
+            wheelGeo = ng;
+          }
+        }
+      }
 
       // Paso 1: computar normales en la geometría original (pre-centrado)
       wheelGeo.computeVertexNormals();
@@ -1357,9 +1473,22 @@ export default function F35C({
           nRim++;
         }
       }
-      const wcx=(wminX+wmaxX)/2;
-      const wcy=nRim > 0 ? rcy / nRim : (wminY+wmaxY)/2;
-      const wcz=nRim > 0 ? rcz / nRim : (wminZ+wmaxZ)/2;
+      let wcx, wcy, wcz;
+      if (percentileCenter && wpos.count >= 10) {
+        // Bbox PERCENTILE midpoint (5%-95%). Robusto al strut residual.
+        const N = wpos.count;
+        const sX = new Float32Array(N), sY = new Float32Array(N), sZ = new Float32Array(N);
+        for (let i = 0; i < N; i++) { sX[i] = wpos.getX(i); sY[i] = wpos.getY(i); sZ[i] = wpos.getZ(i); }
+        sX.sort(); sY.sort(); sZ.sort();
+        const p5 = Math.floor(N * 0.05), p95 = Math.floor(N * 0.95);
+        wcx = (sX[p5] + sX[p95]) / 2;
+        wcy = (sY[p5] + sY[p95]) / 2;
+        wcz = (sZ[p5] + sZ[p95]) / 2;
+      } else {
+        wcx = (wminX+wmaxX)/2;
+        wcy = nRim > 0 ? rcy / nRim : (wminY+wmaxY)/2;
+        wcz = nRim > 0 ? rcz / nRim : (wminZ+wmaxZ)/2;
+      }
 
       // Paso 3: centrar geometría en bbox midpoint
       for (let i=0; i<wpos.count; i++) wpos.setXYZ(i, wpos.getX(i)-wcx, wpos.getY(i)-wcy, wpos.getZ(i)-wcz);
@@ -1367,10 +1496,11 @@ export default function F35C({
       wheelGeo.computeVertexNormals();
 
       // Paso 4: eje exacto por PCA — eigenvector mínimo de la covarianza = disc normal
-      const rearAxleAxis = wheelAxisPCA(wheelGeo, true);
+      const rearAxleAxis = wheelAxisPCA(wheelGeo, true, percentileCenter);
       console.log(`[F35C] ${name} PCA axleAxis: (${rearAxleAxis.x.toFixed(4)}, ${rearAxleAxis.y.toFixed(4)}, ${rearAxleAxis.z.toFixed(4)}) center:(${wcx.toFixed(3)},${wcy.toFixed(3)},${wcz.toFixed(3)})`);
 
-      const wheelMesh = new Mesh(wheelGeo, new MeshStandardMaterial({ color: 0xff1a1a, roughness: 0.8, metalness: 0.0 }));
+      const wheelOrigMat = Array.isArray(obj.material) ? obj.material[0].clone() : obj.material.clone();
+      const wheelMesh = new Mesh(wheelGeo, wheelOrigMat);
       wheelMesh.name = `${name}_wheel`;
       // Posición = centro de la rueda en espacio del parent
       wheelMesh.position.copy(new Vector3(wcx, wcy, wcz).applyMatrix4(obj.matrix));
@@ -1388,13 +1518,107 @@ export default function F35C({
       obj.parent.add(wheelMesh, strutMesh);
       obj.visible = false;
       if (debugRearWheelAxes) {
-        const axisLine = createAxisDebugLine(rearAxleAxis, name.endsWith("055") ? 0x00ffff : 0xffaa00);
+        const axisInParent = rearAxleAxis.clone().applyQuaternion(wheelMesh.quaternion);
+        const axisLine = createAxisDebugLine(axisInParent, name.endsWith("055") ? 0x00ffff : 0xffaa00);
         axisLine.name = `${name}_axisDebug`;
-        wheelMesh.add(axisLine);
+        axisLine.position.copy(wheelMesh.position);
+        obj.parent.add(axisLine);
+        if (typeof window !== 'undefined') {
+          window.__F35C_DBG__ = window.__F35C_DBG__ || {};
+          window.__F35C_DBG__[name] = { wheelMesh, strutMesh, obj, scene: clonedScene };
+        }
       }
       wheelSpinRef.current.push({ pivot: wheelMesh, axis: rearAxleAxis, baseAxis: rearAxleAxis.clone(), isRearWheel: true });
       console.log(`[F35C] ${name} split wheel:${wheelGeo.attributes.position.count/3}t strut:${strutGeo.attributes.position.count/3}t`);
     }
+
+    // Asimetría del modelo: el 055 tiene mirror -1 en su jerarquía y el 056 no.
+    // Reemplazar la geometría del 056 con la del 055 espejada — el espejo se hace en
+    // WORLD space (el avión es simétrico en world X), luego se convierte a local del 056.
+    clonedScene.updateMatrixWorld(true);
+    const ws055pair = wheelSpinRef.current.find(w => w.pivot?.name === "F-35C-BODY055_wheel");
+    const ws056pair = wheelSpinRef.current.find(w => w.pivot?.name === "F-35C-BODY056_wheel");
+    if (ws055pair && ws056pair) {
+      ws055pair.pivot.updateMatrixWorld(true);
+      ws056pair.pivot.updateMatrixWorld(true);
+
+      const srcGeo = ws055pair.pivot.geometry;
+      const cloneGeo = srcGeo.clone();
+      const cpos = cloneGeo.getAttribute('position');
+      const cnml = cloneGeo.getAttribute('normal');
+      // Mirror X de la geo en local
+      for (let i = 0; i < cpos.count; i++) {
+        cpos.setX(i, -cpos.getX(i));
+        if (cnml) cnml.setX(i, -cnml.getX(i));
+      }
+      // Reverse winding
+      const swapV = (attr, a, b) => {
+        const ax = attr.getX(a), ay = attr.getY(a), az = attr.getZ(a);
+        attr.setX(a, attr.getX(b)); attr.setY(a, attr.getY(b)); attr.setZ(a, attr.getZ(b));
+        attr.setX(b, ax); attr.setY(b, ay); attr.setZ(b, az);
+      };
+      for (let t = 0; t < cpos.count; t += 3) {
+        swapV(cpos, t+1, t+2);
+        if (cnml) swapV(cnml, t+1, t+2);
+      }
+      cpos.needsUpdate = true;
+      if (cnml) cnml.needsUpdate = true;
+
+      // Axle local 056 (después del mirror) = -axle055 (X negada)
+      const axleLocal056 = ws055pair.axis.clone();
+      axleLocal056.x = -axleLocal056.x;
+
+      // CORREGIR ÁNGULO usando MATRICES COMPLETAS (no quaternions). Las scales no
+      // uniformes (055 con mirror -1, 056 con +1) hacen que getWorldQuaternion extraiga
+      // rotaciones aproximadas. Con matrixWorld completas obtenemos el axle exacto.
+      const m055 = ws055pair.pivot.matrixWorld;
+      const m056 = ws056pair.pivot.matrixWorld;
+      const p0w55 = new Vector3(0,0,0).applyMatrix4(m055);
+      const p1w55 = ws055pair.axis.clone().applyMatrix4(m055);
+      const axleWorld055 = new Vector3().subVectors(p1w55, p0w55).normalize();
+      const axleWorldDesired = axleWorld055.clone();
+      axleWorldDesired.x = -axleWorldDesired.x;
+      axleWorldDesired.normalize();
+
+      const p0w56 = new Vector3(0,0,0).applyMatrix4(m056);
+      const p1w56 = axleLocal056.clone().applyMatrix4(m056);
+      const axleWorldActual = new Vector3().subVectors(p1w56, p0w56).normalize();
+
+      const qDeltaWorld = new Quaternion().setFromUnitVectors(axleWorldActual, axleWorldDesired);
+      // Convertir delta a frame local del wheelMesh056 usando getWorldQuaternion
+      // (para el frame de aplicación a los verts; el cálculo crítico está hecho con matrices)
+      const qWheel056 = new Quaternion();
+      ws056pair.pivot.getWorldQuaternion(qWheel056);
+      const qDeltaLocal = qWheel056.clone().invert().multiply(qDeltaWorld).multiply(qWheel056);
+
+      // Aplicar la rotación a la geometría
+      const tmpV = new Vector3();
+      for (let i = 0; i < cpos.count; i++) {
+        tmpV.set(cpos.getX(i), cpos.getY(i), cpos.getZ(i)).applyQuaternion(qDeltaLocal);
+        cpos.setX(i, tmpV.x); cpos.setY(i, tmpV.y); cpos.setZ(i, tmpV.z);
+      }
+      if (cnml) {
+        for (let i = 0; i < cnml.count; i++) {
+          tmpV.set(cnml.getX(i), cnml.getY(i), cnml.getZ(i)).applyQuaternion(qDeltaLocal).normalize();
+          cnml.setX(i, tmpV.x); cnml.setY(i, tmpV.y); cnml.setZ(i, tmpV.z);
+        }
+      }
+      cpos.needsUpdate = true;
+      if (cnml) cnml.needsUpdate = true;
+
+      // Aplicar al axle local también — sigue siendo el mismo axle, solo ahora apunta
+      // correctamente en world después de la rotación de la geo.
+      axleLocal056.applyQuaternion(qDeltaLocal).normalize();
+
+      cloneGeo.computeBoundingBox();
+      ws056pair.pivot.geometry.dispose();
+      ws056pair.pivot.geometry = cloneGeo;
+      ws056pair.axis.copy(axleLocal056);
+      ws056pair.baseAxis.copy(axleLocal056);
+      ws056pair.spinSign = 1; // mirror invierte sentido — compensar para que ruede hacia adelante
+      console.log(`[F35C] BODY056 mirrored geo + angle corrected + spinSign flipped`);
+    }
+
 
     const left  = clonedScene.getObjectByName("ButtomWing-LeftFlap");
     const right = clonedScene.getObjectByName("ButtomWing-RightFlap");

@@ -7,6 +7,7 @@ import * as THREE from "three";
 import { ExhaustPlume } from "../common/ExhaustPlume";
 import { HeatShimmer } from "../common/HeatShimmer";
 import { SeatedPilot } from "../common/SeatedPilot";
+import { PHASE_RANGES as HINGE_PHASE_RANGES } from "./F14AIranDebugHinges";
 
 // Reusable temps para wheel spin
 const _wheelTmpQ = new THREE.Quaternion();
@@ -53,6 +54,8 @@ export default function F14AIran({
   pilotEject     = false,
   chuteParams    = null,
   taxiSpeedRef   = null,
+  controlsRef    = null,  // ref a { roll, pitch, rudder, throttle, speed, airborne }
+  noseGearSteerRef = null,  // ref a steering input -1..+1 (rueda delantera)
   position = [0, 0, 0],
   rotation = [0, 0, 0],
   scale = 1,
@@ -91,6 +94,9 @@ export default function F14AIran({
   const hstabsRigged   = useRef(false);
   const nozzleRefs     = useRef([]);
   const nozzlesRigged  = useRef(false);
+  // gearDownT animado (1 = full down, 0 = retraido). Se aproxima al target
+  // (1 cuando !airborne, 0 cuando airborne) en ~4 segundos.
+  const gearDownT = useRef(1);
   // Refs para los plumes (posicion + throttle), uno por nozzle. Memo estable
   // para que ExhaustPlume reciba siempre el mismo objeto entre renders.
   const plumePosRefs = useMemo(() => [
@@ -189,11 +195,28 @@ export default function F14AIran({
     // rigging con matrices natales, y al final restauramos el scale real. Las
     // posiciones capturadas quedan en scene local @ scale=1 — al restaurar scale
     // todo escala proporcionalmente y se ve como en debug pero al tamaño main.
+    // Zero out TODA la cadena de transforms ancestros + scale del outer group.
+    // Asi el rigging corre con scene.matrixWorld = identity (como en debug
+    // scene), todas las capturas de bbox/world matchean los valores de debug
+    // exactamente, y no necesitan compensacion por offsets externos.
     let _savedScale = null;
+    const _savedAncestorPositions = [];
     if (outerGroupRef.current) {
       _savedScale = outerGroupRef.current.scale.clone();
       outerGroupRef.current.scale.set(1, 1, 1);
-      outerGroupRef.current.updateMatrixWorld(true, true);
+      // Save & zero outerGroup position
+      _savedAncestorPositions.push({ node: outerGroupRef.current, pos: outerGroupRef.current.position.clone() });
+      outerGroupRef.current.position.set(0, 0, 0);
+      // Walk up ancestors, save & zero any non-zero positions
+      let node = outerGroupRef.current.parent;
+      while (node) {
+        if (node.position.x !== 0 || node.position.y !== 0 || node.position.z !== 0) {
+          _savedAncestorPositions.push({ node, pos: node.position.clone() });
+          node.position.set(0, 0, 0);
+        }
+        node = node.parent;
+      }
+      outerGroupRef.current.updateWorldMatrix(true, true);
     }
     meta.current.clear();
     scene.traverse(obj => {
@@ -366,11 +389,7 @@ export default function F14AIran({
       const worldBBox = (objName) => {
         const obj = scene.getObjectByName(objName);
         if (!obj) return null;
-        const bbW = new THREE.Box3().setFromObject(obj);
-        return new THREE.Box3(
-          scene.worldToLocal(bbW.min.clone()),
-          scene.worldToLocal(bbW.max.clone()),
-        );
+        return new THREE.Box3().setFromObject(obj);
       };
       const mkLabel = (text) => {
         const canvas = document.createElement("canvas");
@@ -396,13 +415,8 @@ export default function F14AIran({
         const targets = targetNames.map(n => scene.getObjectByName(n)).filter(Boolean);
         if (!bb || targets.length === 0) { hingeData.current.push(null); continue; }
 
-        // def.points son world coords hardcoded (tuneadas en debug a scale=1).
-        // Convertir a scene local para que funcione tambien con outer group escalado.
         const [p0, p1] = def.points
-          ? [
-              scene.worldToLocal(new THREE.Vector3(...def.points[0])),
-              scene.worldToLocal(new THREE.Vector3(...def.points[1])),
-            ]
+          ? [new THREE.Vector3(...def.points[0]), new THREE.Vector3(...def.points[1])]
           : edgeEndpoints(bb, def.edge);
 
         // Pivote ANIDADO: outer setea posicion + orientacion (X local = eje
@@ -505,17 +519,35 @@ export default function F14AIran({
         const g = scene.getObjectByName(groupName);
         if (!g) return;
         const bb = new THREE.Box3().setFromObject(g);
-        const worldCenter = new THREE.Vector3(); bb.getCenter(worldCenter);
+        const worldCenter = new THREE.Vector3(
+          (bb.min.x + bb.max.x) * 0.5,
+          (bb.min.y + bb.max.y) * 0.5,
+          (bb.min.z + bb.max.z) * 0.5
+        );
+        // Pivote del steer = ARRIBA del bbox (donde el strut conecta).
+        // Asi el wheel orbita alrededor del strut al doblar (no spin sobre si).
+        const worldTop = new THREE.Vector3(worldCenter.x, bb.max.y, worldCenter.z);
         g.updateWorldMatrix(true, false);
+        // steerGroup en world TOP — rota Y para steering
+        const steerGroup = new THREE.Group();
+        steerGroup.name = `${groupName}_steer`;
+        steerGroup.position.copy(g.worldToLocal(worldTop.clone()));
+        g.add(steerGroup);
+        steerGroup.updateMatrixWorld(true);
+        // spinPivot en world CENTER (del wheel) — child del steerGroup. Asi:
+        // - spin rota wheel alrededor de su centro (axle X)
+        // - steer rota steerGroup alrededor del top → spinPivot orbita
         const pivot = new THREE.Group();
         pivot.name = `${groupName}_spin`;
-        pivot.position.copy(g.worldToLocal(worldCenter.clone()));
-        g.add(pivot);
-        pivot.updateWorldMatrix(true, false);
-        const prevChildren = g.children.filter(c => c !== pivot);
+        pivot.position.copy(steerGroup.worldToLocal(worldCenter.clone()));
+        steerGroup.add(pivot);
+        pivot.updateMatrixWorld(true);
+        // Reparentar children del wheel group al pivot (preservar world)
+        const prevChildren = g.children.filter(c => c !== steerGroup);
         for (const c of prevChildren) pivot.attach(c);
         wheelSpinData.current.push({
-          kind: "nose", pivot, axis: new THREE.Vector3(1, 0, 0),
+          kind: "nose", g, pivot, steerGroup,
+          axis: new THREE.Vector3(1, 0, 0),
         });
       };
 
@@ -1019,30 +1051,141 @@ export default function F14AIran({
     }
     if (anchors.length) setSeatAnchors(anchors);
 
-    if (typeof window !== 'undefined') window.__F14_SCENE = scene;
-    // Restaurar scale del outer group ahora que el rigging termino.
+    if (typeof window !== 'undefined') {
+      window.__F14_PLUME_POSREFS = plumePosRefs;
+      window.__F14_PLUME_THR = plumeThrottleRef;
+      window.__F14_OUTER = outerGroupRef.current;
+    }
+    // Restaurar scale + posiciones de ancestros que zeroamos.
     if (outerGroupRef.current && _savedScale) {
       outerGroupRef.current.scale.copy(_savedScale);
-      outerGroupRef.current.updateMatrixWorld(true, true);
     }
+    for (const { node, pos } of _savedAncestorPositions) {
+      node.position.copy(pos);
+    }
+    if (outerGroupRef.current) outerGroupRef.current.updateWorldMatrix(true, true);
   }, [scene]);
 
   // Wing sweep — mismos numeros que F14.jsx (v1). El eje X del v6 esta
   // invertido respecto al v1 (x>0 = izq), pero la formula x += ±0.6*sweep
   // ya considera ese signo por ala, asi que se mantiene igual.
   useFrame((_state, delta) => {
-    const sweep = wingSwept * SWEEP_MAX;
+    // Valores efectivos: si hay controlsRef, los derivamos del estado del avion
+    // (throttle/velocidad). Sino usamos los props como fallback.
+    let effSweep = wingSwept;
+    let effNozzle = nozzleDeploy;
+    let effFlaps    = flaps;
+    let effSlats    = slats;
+    let effSpoilers = spoilers;
+    let effRudders  = rudders;
+    let effHStabs   = hstabs;
+    let effHinges   = hinges;
+    if (controlsRef?.current) {
+      const c = controlsRef.current;
+      // Wing sweep schedule del F-14: extendidas (0%) a baja velocidad,
+      // barridas (100%) a alta velocidad. Linear ramp 130-230 m/s (~250-450 kt).
+      const speed = c.speed ?? 0;
+      effSweep = THREE.MathUtils.clamp((speed - 130) / 100, 0, 1);
+      // Nozzle abre con throttle (afterburner). throttle=0 → cerrado, throttle=1 → abierto.
+      effNozzle = c.throttle ?? 0;
+
+      // ── Superficies de control ────────────────────────────────────────
+      // Magnitudes full-deploy (matchean defaults del debug scene).
+      const D2R   = Math.PI / 180;
+      const FLAP_FULL_DEG  = 35;
+      const SLAT_L_DEG     = -17;
+      const SLAT_R_DEG     =  17;
+      const SLAT_OFFSET_X_L =  0.05, SLAT_OFFSET_X_R = -0.05;
+      const SLAT_OFFSET_Y   = -0.17;
+      const SPOILER_FULL_DEG = -56;
+      const SPOILER_OFFSET_L = { x: 0.01, y: -0.09, z: 0.03 };
+      const SPOILER_OFFSET_R = { x: 0,    y:  0.06, z: 0.07 };
+      const RUDDER_FULL_DEG  = 30;
+      const HSTAB_FULL_DEG   = 20;
+
+      // Schedule flaps/slats con velocidad (deploy en aproximacion). Linear
+      // ramp 110→140 m/s: 1 a baja, 0 a alta.
+      const fSched = THREE.MathUtils.clamp(1 - (speed - 110) / 30, 0, 1);
+      effFlaps = [
+        { x: 0, y: 0, z: 0, angle: FLAP_FULL_DEG * D2R * fSched },
+        { x: 0, y: 0, z: 0, angle: FLAP_FULL_DEG * D2R * fSched },
+      ];
+      effSlats = [
+        { x: SLAT_OFFSET_X_L * fSched, y: SLAT_OFFSET_Y * fSched, z: 0,
+          angle: SLAT_L_DEG * D2R * fSched },
+        { x: SLAT_OFFSET_X_R * fSched, y: SLAT_OFFSET_Y * fSched, z: 0,
+          angle: SLAT_R_DEG * D2R * fSched },
+      ];
+
+      // Spoilers como roll-assist: la rueda que baja levanta el spoiler.
+      // roll>0 = banco derecho (ala derecha baja) → R spoiler arriba.
+      // Authority cae a 0 cuando el ala se barre (>50% sweep), igual que
+      // el avion real: a alta velocidad el roll lo manda el rolling tail.
+      const roll = c.roll ?? 0;
+      const spoilerAuth = 1 - THREE.MathUtils.smoothstep(effSweep, 0.40, 0.70);
+      const tSpoilerR = Math.max(0, roll) * spoilerAuth;
+      const tSpoilerL = Math.max(0, -roll) * spoilerAuth;
+      // L tiene invertDeploy=true: el modelo viene OPEN, asi que la pose
+      // "full" representa el cierre. Para abrir el L, t aplicado = 1 - tSpoilerL.
+      const tApplyL = 1 - tSpoilerL;
+      const tApplyR = tSpoilerR;
+      effSpoilers = [
+        { x: SPOILER_OFFSET_L.x * tApplyL, y: SPOILER_OFFSET_L.y * tApplyL,
+          z: SPOILER_OFFSET_L.z * tApplyL, angle: SPOILER_FULL_DEG * D2R * tApplyL },
+        { x: SPOILER_OFFSET_R.x * tApplyR, y: SPOILER_OFFSET_R.y * tApplyR,
+          z: SPOILER_OFFSET_R.z * tApplyR, angle: SPOILER_FULL_DEG * D2R * tApplyR },
+      ];
+
+      // Rudders por yaw (-1..+1). Ambos deflectan en el mismo signo.
+      const rudder = c.rudder ?? 0;
+      effRudders = [
+        { x: 0, y: 0, z: 0, angle: RUDDER_FULL_DEG * D2R * rudder },
+        { x: 0, y: 0, z: 0, angle: RUDDER_FULL_DEG * D2R * rudder },
+      ];
+
+      // Gear: animar gearDownT hacia target (1 cuando en tierra, 0 en vuelo).
+      // RETRACT_TIME ~4s = transicion completa de full down → retraido.
+      const RETRACT_TIME = 4.0;
+      const gearTarget = c.airborne ? 0 : 1;
+      const gd = gearDownT.current;
+      const step = delta / RETRACT_TIME;
+      gearDownT.current = gd + Math.sign(gearTarget - gd) *
+        Math.min(Math.abs(gearTarget - gd), step);
+      // effHinges = hinges (full deploy pose) × phase(gearDownT, [a,b]) por bisagra.
+      const _gdT = gearDownT.current;
+      effHinges = hinges.map((h, i) => {
+        const range = HINGE_PHASE_RANGES[i] || [0, 1];
+        const p = Math.max(0, Math.min(1, (_gdT - range[0]) / (range[1] - range[0])));
+        return { x: h.x * p, y: h.y * p, z: h.z * p, angle: h.angle * p };
+      });
+
+      // HStabs (stabilators) por pitch (-1..+1). Pitch nose-up → trailing
+      // edge UP → angle negativo (ajustar signo segun convencion del modelo).
+      const pitch = c.pitch ?? 0;
+      // Rolling tail: deflexion diferencial de stabilators ayuda al roll.
+      // Mix ~50% del rango full. roll>0 (banco der) → L trailing edge down,
+      // R trailing edge up (eleva R, baja L → genera roll a la derecha).
+      const HSTAB_ROLL_MIX = 0.5;
+      const pitchAng = -HSTAB_FULL_DEG * D2R * pitch;
+      const rollAng  = -HSTAB_FULL_DEG * D2R * roll * HSTAB_ROLL_MIX;
+      effHStabs = [
+        { x: 0, y: 0, z: 0, angle: pitchAng + rollAng },
+        { x: 0, y: 0, z: 0, angle: pitchAng - rollAng },
+      ];
+    }
+
+    const sweep = effSweep * SWEEP_MAX;
     if (wingL.current) {
       const o = wingLOrig.current;
-      wingL.current.position.x = o.x + wingSwept * 0.6;
-      wingL.current.position.y = o.y + wingSwept * (-2.17);
+      wingL.current.position.x = o.x + effSweep * 0.6;
+      wingL.current.position.y = o.y + effSweep * (-2.17);
       wingL.current.position.z = o.z;
       wingL.current.rotation.z = sweep;
     }
     if (wingR.current) {
       const o = wingROrig.current;
-      wingR.current.position.x = o.x - wingSwept * 0.6;
-      wingR.current.position.y = o.y + wingSwept * (-2.17);
+      wingR.current.position.x = o.x - effSweep * 0.6;
+      wingR.current.position.y = o.y + effSweep * (-2.17);
       wingR.current.position.z = o.z;
       wingR.current.rotation.z = -sweep;
     }
@@ -1114,7 +1257,7 @@ export default function F14AIran({
     for (let i = 0; i < hingeData.current.length; i++) {
       const hd = hingeData.current[i];
       if (!hd) continue;
-      const cfg = hinges[i] || DEFAULT_HINGES[i];
+      const cfg = effHinges[i] || DEFAULT_HINGES[i];
       const ox = cfg.x || 0, oy = cfg.y || 0, oz = cfg.z || 0;
       const p0 = hd.baseP0.clone().add(new THREE.Vector3(ox, oy, oz));
       const p1 = hd.baseP1.clone().add(new THREE.Vector3(ox, oy, oz));
@@ -1134,7 +1277,7 @@ export default function F14AIran({
     for (let i = 0; i < spoilerData.current.length; i++) {
       const sd = spoilerData.current[i];
       if (!sd) continue;
-      const cfg = spoilers[i] || { x: 0, y: 0, z: 0, angle: 0 };
+      const cfg = effSpoilers[i] || { x: 0, y: 0, z: 0, angle: 0 };
       const ox = cfg.x || 0, oy = cfg.y || 0, oz = cfg.z || 0;
       const p0 = sd.baseP0.clone().add(new THREE.Vector3(ox, oy, oz));
       const p1 = sd.baseP1.clone().add(new THREE.Vector3(ox, oy, oz));
@@ -1153,7 +1296,7 @@ export default function F14AIran({
     for (let i = 0; i < flapData.current.length; i++) {
       const fd = flapData.current[i];
       if (!fd) continue;
-      const cfg = flaps[i] || { x: 0, y: 0, z: 0, angle: 0 };
+      const cfg = effFlaps[i] || { x: 0, y: 0, z: 0, angle: 0 };
       const ox = cfg.x || 0, oy = cfg.y || 0, oz = cfg.z || 0;
       const p0 = fd.baseP0.clone().add(new THREE.Vector3(ox, oy, oz));
       const p1 = fd.baseP1.clone().add(new THREE.Vector3(ox, oy, oz));
@@ -1172,7 +1315,7 @@ export default function F14AIran({
     for (let i = 0; i < slatData.current.length; i++) {
       const ld = slatData.current[i];
       if (!ld) continue;
-      const cfg = slats[i] || { x: 0, y: 0, z: 0, angle: 0 };
+      const cfg = effSlats[i] || { x: 0, y: 0, z: 0, angle: 0 };
       const ox = cfg.x || 0, oy = cfg.y || 0, oz = cfg.z || 0;
       const p0 = ld.baseP0.clone().add(new THREE.Vector3(ox, oy, oz));
       const p1 = ld.baseP1.clone().add(new THREE.Vector3(ox, oy, oz));
@@ -1191,7 +1334,7 @@ export default function F14AIran({
     for (let i = 0; i < rudderData.current.length; i++) {
       const rd = rudderData.current[i];
       if (!rd) continue;
-      const cfg = rudders[i] || { x: 0, y: 0, z: 0, angle: 0 };
+      const cfg = effRudders[i] || { x: 0, y: 0, z: 0, angle: 0 };
       const ox = cfg.x || 0, oy = cfg.y || 0, oz = cfg.z || 0;
       const p0 = rd.baseP0.clone().add(new THREE.Vector3(ox, oy, oz));
       const p1 = rd.baseP1.clone().add(new THREE.Vector3(ox, oy, oz));
@@ -1210,10 +1353,10 @@ export default function F14AIran({
     // (fondo achica). fondoF = lerp(closedF, 1, deploy). En deploy=1 no cambia.
     // Adicionalmente: nozzleClosedOffset traslada la pieza ENTERA al cerrar.
     const closedFactor = 1 / NOZZLE_OPEN_SCALE;
-    const fondoF = closedFactor + (1 - closedFactor) * nozzleDeploy;
-    const closedAmt = 1 - nozzleDeploy;
+    const fondoF = closedFactor + (1 - closedFactor) * effNozzle;
+    const closedAmt = 1 - effNozzle;
     const axisPt = new THREE.Vector3();
-    plumeThrottleRef.current = nozzleDeploy;
+    plumeThrottleRef.current = effNozzle;
     for (let nzi = 0; nzi < nozzleRefs.current.length; nzi++) {
       const nz = nozzleRefs.current[nzi];
       if (!nz || !nz.meshes) continue;
@@ -1248,7 +1391,7 @@ export default function F14AIran({
     for (let i = 0; i < hstabData.current.length; i++) {
       const hd = hstabData.current[i];
       if (!hd) continue;
-      const cfg = hstabs[i] || { x: 0, y: 0, z: 0, angle: 0 };
+      const cfg = effHStabs[i] || { x: 0, y: 0, z: 0, angle: 0 };
       const ox = cfg.x || 0, oy = cfg.y || 0, oz = cfg.z || 0;
       const p0 = hd.baseP0.clone().add(new THREE.Vector3(ox, oy, oz));
       const p1 = hd.baseP1.clone().add(new THREE.Vector3(ox, oy, oz));
@@ -1274,6 +1417,17 @@ export default function F14AIran({
       ws.alignGroup.quaternion.setFromAxisAngle(_wheelTmpV, STEER * sign);
     }
 
+    // Nose wheel STEERING: input -1..+1 con clamp a ±NOSE_STEER_MAX.
+    // Eje de rotacion = world Y (vertical) convertido al frame local del wheel.
+    const NOSE_STEER_MAX = THREE.MathUtils.degToRad(35);
+    const steerInput = THREE.MathUtils.clamp(noseGearSteerRef?.current ?? 0, -1, 1);
+    for (const ws of wheelSpinData.current) {
+      if (ws.kind !== "nose" || !ws.steerGroup) continue;
+      ws.g.getWorldQuaternion(_wheelTmpQ);
+      _wheelTmpV.set(0, 1, 0).applyQuaternion(_wheelTmpQ.invert());
+      ws.steerGroup.quaternion.setFromAxisAngle(_wheelTmpV, -steerInput * NOSE_STEER_MAX);
+    }
+
     // Wheel spin — proporcional a taxiSpeedRef (m/s). Solo gira si gear
     // esta extendido (no tiene sentido girar plegadas dentro del bay).
     const taxiSpeed = taxiSpeedRef?.current ?? 0;
@@ -1283,13 +1437,10 @@ export default function F14AIran({
       const dAngle = omega * delta;
       for (const ws of wheelSpinData.current) {
         if (ws.kind === "nose") {
-          if (ws.pivot.parent) {
-            ws.pivot.parent.getWorldQuaternion(_wheelTmpQ);
-            _wheelTmpV.copy(ws.axis).applyQuaternion(_wheelTmpQ.invert());
-            ws.pivot.rotateOnAxis(_wheelTmpV, dAngle);
-          } else {
-            ws.pivot.rotateOnAxis(ws.axis, dAngle);
-          }
+          // Spin alrededor del axle LOCAL (no world X). Asi al doblar el avion
+          // el axis de spin gira con el avion → wheel rola en la direccion
+          // correcta sin "volverse loca".
+          ws.pivot.rotateOnAxis(ws.axis, dAngle);
         } else {
           _wheelTmpQ.copy(ws.pivot.quaternion).invert();
           _wheelTmpV.copy(ws.axleLocal).applyQuaternion(_wheelTmpQ);

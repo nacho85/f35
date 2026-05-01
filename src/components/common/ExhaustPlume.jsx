@@ -48,6 +48,8 @@ const _plumeGeo = buildPlumeGeo();
 const _ptMat = new ShaderMaterial({
   uniforms: { uTime: { value: 0 }, uThrottle: { value: 0 } },
   vertexShader: `
+    #include <common>
+    #include <logdepthbuf_pars_vertex>
     attribute vec4  aData;
     attribute float aExtra;
     uniform float uTime;
@@ -100,9 +102,12 @@ const _ptMat = new ShaderMaterial({
       vPhase     = phase;
       vMachWave  = machWv;
       gl_Position = projectionMatrix * mvPos;
+      #include <logdepthbuf_vertex>
     }
   `,
   fragmentShader: `
+    #include <common>
+    #include <logdepthbuf_pars_fragment>
     uniform float uTime;
     uniform float uThrottle;
     varying float vNr;
@@ -111,6 +116,7 @@ const _ptMat = new ShaderMaterial({
     varying float vPhase;
     varying float vMachWave;
     void main() {
+      #include <logdepthbuf_fragment>
       vec2  uv   = gl_PointCoord - 0.5;
       float r    = length(uv) * 2.0;
 
@@ -174,6 +180,8 @@ const _glowGeo = (() => {
 const _glowMat = new ShaderMaterial({
   uniforms: { uThrottle: { value: 0 }, uTime: { value: 0 } },
   vertexShader: `
+    #include <common>
+    #include <logdepthbuf_pars_vertex>
     uniform float uThrottle;
     void main() {
       vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
@@ -182,12 +190,16 @@ const _glowMat = new ShaderMaterial({
       float worldSz = abG * 0.70;
       gl_PointSize = clamp(worldSz * projectionMatrix[1][1] * 300.0 / dist, 1.0, 90.0);
       gl_Position  = projectionMatrix * mvPos;
+      #include <logdepthbuf_vertex>
     }
   `,
   fragmentShader: `
+    #include <common>
+    #include <logdepthbuf_pars_fragment>
     uniform float uThrottle;
     uniform float uTime;
     void main() {
+      #include <logdepthbuf_fragment>
       vec2  uv = gl_PointCoord - 0.5;
       float r  = length(uv) * 2.0;
       float g  = pow(1.0 - smoothstep(0.0, 1.0, r), 1.5);
