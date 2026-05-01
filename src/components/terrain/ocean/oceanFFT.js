@@ -107,17 +107,19 @@ export class OceanFFT {
     });
     this._evolutionScene.add(new THREE.Mesh(this._fsQuadGeom, this._evolutionMaterial));
 
-    this._evolutionMaterialZ = this._evolutionMaterial.clone();
-    // Compartimos los uniforms del primario (mismo objeto)
-    this._evolutionMaterialZ.uniforms.uH0         = this._evolutionMaterial.uniforms.uH0;
-    this._evolutionMaterialZ.uniforms.uResolution = this._evolutionMaterial.uniforms.uResolution;
-    this._evolutionMaterialZ.uniforms.uPatchSize  = this._evolutionMaterial.uniforms.uPatchSize;
-    this._evolutionMaterialZ.uniforms.uTime       = this._evolutionMaterial.uniforms.uTime;
-    this._evolutionMaterialZ.fragmentShader = evolutionFragmentShader.replace(
-      "float kxn = k.x / kLen;",
-      "float kxn = k.y / kLen;"
-    );
-    this._evolutionMaterialZ.needsUpdate = true;
+    // Crear material Z manualmente (sin clone) compartiendo uniforms.
+    // .clone() dispara warning "Textures of render targets cannot be cloned"
+    // porque uH0 referencia un render target texture.
+    this._evolutionMaterialZ = new THREE.ShaderMaterial({
+      vertexShader: evolutionVertexShader,
+      fragmentShader: evolutionFragmentShader.replace(
+        "float kxn = k.x / kLen;",
+        "float kxn = k.y / kLen;"
+      ),
+      uniforms: this._evolutionMaterial.uniforms, // shared by reference
+      depthTest: false,
+      depthWrite: false,
+    });
 
     this._evolutionSceneZ = new THREE.Scene();
     this._evolutionSceneZ.add(new THREE.Mesh(this._fsQuadGeom, this._evolutionMaterialZ));

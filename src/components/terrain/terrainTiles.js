@@ -28,8 +28,15 @@ function loadImage(url) {
 // reales (matchea tonalmente con la imagen de Mapbox alrededor). Carga lazy.
 const _waterManifests = new Map(); // zoom → Promise<{ set, color } | null>
 const FALLBACK_WATER_FILL = "#3a5878";
+// Solo z15 tiene manifest bakeado. Otros zooms → null sin fetch (evita 404).
+const AVAILABLE_WATER_MANIFESTS = new Set([15]);
 function loadWaterManifest(zoom) {
   if (_waterManifests.has(zoom)) return _waterManifests.get(zoom);
+  if (!AVAILABLE_WATER_MANIFESTS.has(zoom)) {
+    const p = Promise.resolve(null);
+    _waterManifests.set(zoom, p);
+    return p;
+  }
   const p = fetch(`/water-manifest-z${zoom}.json`)
     .then((r) => (r.ok ? r.json() : null))
     .then((j) => (j ? { set: new Set(j.water), color: j.waterColor || FALLBACK_WATER_FILL } : null))
