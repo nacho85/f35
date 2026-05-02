@@ -66,7 +66,10 @@ export const spectrumFragmentShader = /* glsl */ `
     float L  = V * V / G;
     float kL = kLen * L;
 
-    float dirFactor = pow(max(dot(kHat, wHat), 0.0), 2.0);
+    // Directional factor relajado: pow=0.5 (broad spread) + abs (no clip a -k)
+    // → ondas se propagan más en TODAS las direcciones, no solo wind-aligned.
+    // Resultado: choques entre olas → foam por interferencia.
+    float dirFactor = pow(abs(dot(kHat, wHat)), 0.5);
 
     // damping de ondas muy chicas (suppress < l)
     float l = L / 1000.0;

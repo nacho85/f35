@@ -13,7 +13,6 @@ import F14AIran from "../f14a-iran/F14AIran";
 import { HINGE_DEFAULTS as F14_HINGE_DEFAULTS } from "../f14a-iran/F14AIranDebugHinges";
 import GulfFallbackTerrain from "../terrain/GulfFallbackTerrain";
 import OrmuzTerrain from "../terrain/OrmuzTerrain";
-import GulfInfiniteWater from "../terrain/GulfInfiniteWater";
 
 useGLTF.preload("/f-35a.glb");
 
@@ -757,13 +756,6 @@ export default function F35Scene() {
         </group>
 
         {/* Agua infinita del Golfo — plano 200×200 km con shader de Water
-            (three-stdlib): reflexión planar + Fresnel + normales animadas.
-            Fuera de worldRef → siempre centrado en el avión, no se "termina"
-            cuando volás lejos. Donde el WT terrain sube sobre y=0, el terreno
-            tapa el agua; donde está plano (mar real), el agua es visible. */}
-        {/* DEBUG: agua deshabilitada temporalmente para ver el satelital crudo */}
-        {/* <GulfInfiniteWater y={SURFACE_Y - 8.0} sunDirection={[80, 150, -60]} /> */}
-
         <FlightControllerBodyAxis
           inputRef={inputRef}
           onHudChange={setHud}

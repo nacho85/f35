@@ -4,10 +4,8 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useRef, useEffect, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "@react-three/drei";
-import OrmuzTerrain from "./OrmuzTerrain";
-import OceanWater from "./OceanWater";
+import OrmuzTerrain, { setHorizonTuning } from "./OrmuzTerrain";
 import FFTOcean from "./FFTOcean";
-import PersianGulfWater from "./PersianGulfWater";
 import WeatherSystem from "./WeatherSystem";
 import OSMAirport from "./OSMAirport";
 import { fetchSatelliteCanvas } from "./terrainTiles";
@@ -415,6 +413,18 @@ export default function BandarAbbasTestScene() {
   const [minimapBg, setMinimapBg] = useState(null);
   const [progress, setProgress] = useState({ loaded: 0, total: 1 });
   const [hour, setHour] = useState(14);
+  const [waveCfg, setWaveCfg] = useState({
+    coastAngle: 0,        // 0°
+    coastAmount: 1.0,     // 100%
+    offshoreAmount: 0.45, // 45%
+  });
+  const [horizonCfg, setHorizonCfg] = useState({
+    elev:  0.139,  // sin(8°) — bias del sample HDRI hacia arriba
+    clamp: 0.70,   // pre-clamp HDR para evitar quemar el sol
+  });
+  useEffect(() => {
+    setHorizonTuning(horizonCfg);
+  }, [horizonCfg]);
   const [weather, setWeather] = useState("clear");
   // Defaults: airport zone matchea el carving (1500×2500), pistas centradas en
   // TFB.9 con orientación 03/21 (-30° del norte).
@@ -463,6 +473,47 @@ export default function BandarAbbasTestScene() {
       <HUD avatarPosRef={avatarPosRef} />
       <Minimap avatarPosRef={avatarPosRef} bgUrl={minimapBg} />
       <WeatherPanel hour={hour} setHour={setHour} weather={weather} setWeather={setWeather} />
+      <div style={{
+        position: "absolute", top: 200, left: 16, zIndex: 10,
+        padding: "10px 14px", borderRadius: 8,
+        background: "rgba(6,10,18,0.76)", color: "#bdd0ea",
+        fontFamily: "monospace", fontSize: 12, lineHeight: 1.5, width: 240,
+      }}>
+        <div style={{ color: "#eef4ff", fontWeight: 600, marginBottom: 6 }}>Wave Foam</div>
+        <label style={{ display: "block", marginBottom: 4 }}>
+          Ángulo olas costeras: <span style={{ color: "#eef4ff" }}>{(waveCfg.coastAngle * 180 / Math.PI).toFixed(0)}°</span>
+          <input type="range" min={-Math.PI} max={Math.PI} step={0.01} value={waveCfg.coastAngle}
+            onChange={(e) => setWaveCfg({ ...waveCfg, coastAngle: parseFloat(e.target.value) })}
+            style={{ width: "100%" }} />
+        </label>
+        <label style={{ display: "block", marginBottom: 4 }}>
+          Cantidad olas costeras: <span style={{ color: "#eef4ff" }}>{(waveCfg.coastAmount * 100).toFixed(0)}%</span>
+          <input type="range" min={0} max={2} step={0.01} value={waveCfg.coastAmount}
+            onChange={(e) => setWaveCfg({ ...waveCfg, coastAmount: parseFloat(e.target.value) })}
+            style={{ width: "100%" }} />
+        </label>
+        <label style={{ display: "block" }}>
+          Cantidad olas offshore: <span style={{ color: "#eef4ff" }}>{(waveCfg.offshoreAmount * 100).toFixed(0)}%</span>
+          <input type="range" min={0} max={2} step={0.01} value={waveCfg.offshoreAmount}
+            onChange={(e) => setWaveCfg({ ...waveCfg, offshoreAmount: parseFloat(e.target.value) })}
+            style={{ width: "100%" }} />
+        </label>
+        <div style={{ marginTop: 10, paddingTop: 8, borderTop: "1px solid rgba(173,191,214,0.18)" }}>
+          <div style={{ color: "#eef4ff", fontWeight: 600, marginBottom: 4 }}>Horizon</div>
+          <label style={{ display: "block", marginBottom: 4 }}>
+            Sky elevation: <span style={{ color: "#eef4ff" }}>{(Math.asin(Math.min(1, horizonCfg.elev)) * 180/Math.PI).toFixed(1)}°</span>
+            <input type="range" min={-0.2} max={0.6} step={0.005} value={horizonCfg.elev}
+              onChange={(e) => setHorizonCfg({ ...horizonCfg, elev: parseFloat(e.target.value) })}
+              style={{ width: "100%" }} />
+          </label>
+          <label style={{ display: "block" }}>
+            HDR clamp: <span style={{ color: "#eef4ff" }}>{horizonCfg.clamp.toFixed(2)}</span>
+            <input type="range" min={0.5} max={4} step={0.05} value={horizonCfg.clamp}
+              onChange={(e) => setHorizonCfg({ ...horizonCfg, clamp: parseFloat(e.target.value) })}
+              style={{ width: "100%" }} />
+          </label>
+        </div>
+      </div>
 
       <Canvas
         camera={{ position: [200, 500, 800], fov: 50, near: 1, far: 500000 }}
@@ -504,7 +555,15 @@ export default function BandarAbbasTestScene() {
             en 35-45 km para evitar plane-edge halo contra HDRI. Water mask
             del outer z10 satellite — discard sobre tierra. */}
         {/* FFT ocean estático cubriendo todo el área (mismo size que el mask). */}
-        <FFTOcean size={WT_OUTER_WORLD_SIZE} segments={512} patchSize={2000} resolution={256} y={-2} followCamera={false} />
+        <FFTOcean
+          size={32000} segments={1024} patchSize={2000} resolution={256} y={-2} followCamera={true}
+          phillipsA={2e-2} windSpeed={28}
+          coastWaveAngle={waveCfg.coastAngle}
+          coastFoamAmount={waveCfg.coastAmount}
+          offshoreFoamAmount={waveCfg.offshoreAmount}
+          horizonElev={horizonCfg.elev}
+          horizonClamp={horizonCfg.clamp}
+        />
       </Canvas>
     </main>
   );

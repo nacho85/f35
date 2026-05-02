@@ -8,7 +8,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 // Altura de escala atmosférica (m). 5km = balance entre bruma visible al
 // nivel del mar y crisp a altura. Con 10km a baja altura quemaba el
 // horizonte en blanco; con 3km a 8km de altura desaparecía.
-const FOG_SCALE_HEIGHT = 5000;
+const FOG_SCALE_HEIGHT = 12000;
 
 // Hora del día → vector dirección hacia el sol (solo para la directional light;
 // el cielo HDRI es estático y tiene su propio sol bakeado).
@@ -40,7 +40,7 @@ const PRESETS = {
     // WT donde montañas distantes se desaturan en tono azul-grisaceo.
     // ~5% a 50km, ~22% a 100km, ~63% a 200km, ~95% a 300km.
     file: "/textures/sky/qwantani_4k.hdr",
-    fogDensity: 0.000005, fogColor: "#c4d4e0",
+    fogDensity: 0.000018, fogColor: "#7a96b8",
     sunMultiplier: 1.0, ambientBase: 0.30,
     horizonTint: "#7eb6e8",
     clouds: null,
@@ -171,11 +171,12 @@ export default function WeatherSystem({ hour = 14, weather = "clear" }) {
         backgroundBlurriness={0}
       />
 
-      {/* Fog con density 0 — efectivamente sin niebla visible, pero los
-          uniforms del shader siguen existiendo para que materiales no
-          rompan al recompilar (cambio de weather, etc). El water shader
-          usa aerial perspective propio (sample HDRI per-direction). */}
-      <fogExp2 attach="fog" args={[preset.fogColor, 0]} />
+      {/* Fog atmosférico activado para terreno. El water shader usa aerial
+          perspective propio (HDRI per-direction) y tiene fog:false para no
+          superponer ambos efectos. El FogAltitudeAdjuster ajusta densidad
+          según altura — atmósfera real, más denso a baja altitude. */}
+      <fogExp2 attach="fog" args={[preset.fogColor, preset.fogDensity]} />
+      <FogAltitudeAdjuster baseDensity={preset.fogDensity} />
 
       {/* Directional = sol para shadows y modelado direccional sobre el
           terreno. Sin castShadow porque el shadow.camera default no cubre

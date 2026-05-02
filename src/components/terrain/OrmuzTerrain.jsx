@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useThree } from "@react-three/fiber";
 import * as THREE from "three";
+import { HDRLoader } from "three/examples/jsm/loaders/HDRLoader.js";
 
 import {
   TERRAIN_CENTER_LAT,
@@ -256,7 +257,6 @@ function applyWaterDiscard(material, opts = {}) {
   const sharedRef = getSharedCoastlineSDF();
   material.userData.uCoastMask    = sharedRef;
   material.userData.uCoastMaskSz  = { value: COASTLINE_MASK_WORLD_SIZE };
-
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uCoastMask   = material.userData.uCoastMask;
     shader.uniforms.uCoastMaskSz = material.userData.uCoastMaskSz;
@@ -480,6 +480,143 @@ if (_isLand_n)
 
     material.userData.detailShader = shader;
   };
+  material.needsUpdate = true;
+}
+
+// Refs compartidos para horizon tuning — todos los materiales bindean a estos
+// objetos vía userData → cambiar .value desde el componente actualiza todos
+// los shaders al instante (sin recompile).
+const _horizonElev  = { value: 0.139 }; // sin(8°)
+const _horizonClamp = { value: 0.70 };
+export function setHorizonTuning({ elev, clamp }) {
+  if (typeof elev  === "number") _horizonElev.value  = elev;
+  if (typeof clamp === "number") _horizonClamp.value = clamp;
+}
+
+// Singleton del HDRI cubemap para sampling de horizon color en aerial
+// perspective. Mismo asset que carga FFTOcean (qwantani 4k) → consistencia
+// visual entre terreno y agua. Carga lazy (la primera llamada inicia el
+// fetch, las siguientes obtienen el ref vacío que se llena cuando termina).
+let _sharedHorizonCube = null;
+const _horizonCubeWaiters = [];
+function getSharedHorizonCube(gl) {
+  if (_sharedHorizonCube) return { value: _sharedHorizonCube };
+  const ref = { value: null };
+  _horizonCubeWaiters.push(ref);
+  if (_horizonCubeWaiters.length === 1) {
+    new HDRLoader().load("/textures/sky/qwantani_4k.hdr", (t) => {
+      t.mapping = THREE.EquirectangularReflectionMapping;
+      const target = new THREE.WebGLCubeRenderTarget(256);
+      target.fromEquirectangularTexture(gl, t);
+      target.texture.generateMipmaps = false;
+      target.texture.minFilter = THREE.LinearFilter;
+      target.texture.magFilter = THREE.LinearFilter;
+      _sharedHorizonCube = target.texture;
+      _horizonCubeWaiters.forEach((r) => (r.value = _sharedHorizonCube));
+      _horizonCubeWaiters.length = 0;
+      t.dispose();
+    });
+  }
+  return ref;
+}
+
+// Aerial perspective per-pixel — modela la atmósfera exponencial de la Tierra
+// (scale height ~8.4km) y atenúa el color del terreno hacia el color del
+// horizonte según la profundidad óptica del rayo cámara→terreno.
+//
+// Modelo: density(altitude) = ρ₀·exp(-h/H), aproximamos la integral del rayo
+// por la altura PROMEDIO entre cámara y fragmento (1er-orden, error <12% en
+// rangos extremos). Ventajas vs FogExp2 global:
+//  - Mirando recto abajo desde altura: rayo corto + altura promedio alta →
+//    poca bruma → terreno crisp (correcto: ISS ve barcos)
+//  - Mirando oblicuo hacia el horizonte: rayo largo + altura promedio baja →
+//    mucha bruma → terreno se funde con el cielo (correcto: avión comercial)
+//  - El terreno alto (montaña) atenúa menos que el valle a la misma distancia
+//    horizontal porque el rayo atraviesa menos columna de aire.
+function applyAerialPerspective(material, gl) {
+  // Cubemap HDRI compartido para sampling de horizon color → blend exacto
+  // con el cielo de fondo, sin línea de contraste en el horizonte.
+  const horizonRef = gl ? getSharedHorizonCube(gl) : { value: null };
+  material.userData.uHorizonEnv = horizonRef;
+  material.userData.uHasHorizonEnv = { value: horizonRef.value ? 1.0 : 0.0 };
+  material.userData.uHorizonElev = _horizonElev;
+  material.userData.uHorizonClamp = _horizonClamp;
+  if (!horizonRef.value) {
+    const tick = () => {
+      if (horizonRef.value) {
+        material.userData.uHasHorizonEnv.value = 1.0;
+      } else {
+        requestAnimationFrame(tick);
+      }
+    };
+    requestAnimationFrame(tick);
+  }
+
+  material.onBeforeCompile = (function (prevHook) {
+    return (shader) => {
+      if (prevHook) prevHook(shader);
+      shader.uniforms.uHorizonEnv    = material.userData.uHorizonEnv;
+      shader.uniforms.uHasHorizonEnv = material.userData.uHasHorizonEnv;
+      shader.uniforms.uHorizonElev   = material.userData.uHorizonElev;
+      shader.uniforms.uHorizonClamp  = material.userData.uHorizonClamp;
+
+      // Inject world position varying (sin pisar los que ya inyectaron
+      // applyWaterDiscard / applyDetailBlending — ellos usan _wd / _dt).
+      shader.vertexShader = shader.vertexShader.replace(
+        "#include <fog_vertex>",
+        `#include <fog_vertex>
+        vWorldPos_ap = (modelMatrix * vec4(transformed, 1.0)).xyz;`
+      ).replace(
+        "#include <common>",
+        `#include <common>
+        varying vec3 vWorldPos_ap;`
+      );
+
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "#include <common>",
+        `#include <common>
+        varying vec3 vWorldPos_ap;
+        uniform samplerCube uHorizonEnv;
+        uniform float       uHasHorizonEnv;
+        uniform float       uHorizonElev;
+        uniform float       uHorizonClamp;`
+      ).replace(
+        "#include <fog_fragment>",
+        `
+        // Aerial perspective Chapman-approx: optical depth integrada del rayo
+        // cámara→terreno asumiendo atmósfera exponencial con scale height H.
+        // Horizon color = sample del HDRI en la dirección cámara→frag → el
+        // terreno fundido a distancia matchea EXACTAMENTE con el cielo arriba
+        // → no hay línea de contraste.
+        {
+          const float H_SCALE = 8400.0;
+          const float K_EXT   = 2.0e-5;
+          vec3 _toFrag = vWorldPos_ap - cameraPosition;
+          float _dist  = length(_toFrag);
+          float _hCam  = max(cameraPosition.y, 0.0);
+          float _hFrag = max(vWorldPos_ap.y,    0.0);
+          float _hAvg  = (_hCam + _hFrag) * 0.5;
+          float _tau   = K_EXT * _dist * exp(-_hAvg / H_SCALE);
+          float _trans = exp(-_tau);
+          vec3 _hzCol;
+          if (uHasHorizonEnv > 0.5) {
+            vec3 _viewDir = normalize(_toFrag);
+            vec3 _skyDir = normalize(vec3(_viewDir.x, uHorizonElev, _viewDir.z));
+            _hzCol = textureCube(uHorizonEnv, _skyDir).rgb;
+            _hzCol = min(_hzCol, vec3(uHorizonClamp));
+            _hzCol = _hzCol / (1.0 + _hzCol);
+            _hzCol *= 2.0;
+          } else {
+            _hzCol = vec3(0.42, 0.54, 0.69);
+          }
+          gl_FragColor.rgb = mix(_hzCol, gl_FragColor.rgb, _trans);
+        }
+        `
+      );
+    };
+  })(material.onBeforeCompile);
+  const prevKey = material.customProgramCacheKey?.bind(material);
+  material.customProgramCacheKey = () => (prevKey ? prevKey() : "") + "_ap_v4";
   material.needsUpdate = true;
 }
 
@@ -835,6 +972,7 @@ export default function OrmuzTerrain({ token, groundY = 0, onProgress }) {
         metalness: 0,
       });
       applyWaterDiscard(mat);
+      applyAerialPerspective(mat, gl);
       meshRef.material = mat;
       if (oldMat) oldMat.dispose();
     });
@@ -868,6 +1006,7 @@ export default function OrmuzTerrain({ token, groundY = 0, onProgress }) {
         metalness: 0,
       });
       applyWaterDiscard(outerMat);
+      applyAerialPerspective(outerMat, gl);
       outerRef.current.material = outerMat;
       if (oldMat) oldMat.dispose();
     }
@@ -892,6 +1031,7 @@ export default function OrmuzTerrain({ token, groundY = 0, onProgress }) {
         depthWrite: false,
       });
       applyWaterDiscard(aMat, { blur: true });
+      applyAerialPerspective(aMat, gl);
       airportRef.current.material = aMat;
       if (oldMat) oldMat.dispose();
       // Water-discard en z17 SÍ se mantiene: para cubrir la harbor cyan
