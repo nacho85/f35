@@ -47,8 +47,10 @@ export async function getCachedCanvas(key) {
 
 export async function putCachedCanvas(key, canvas, quality = 0.85) {
   try {
+    // WebP: ~30% más chico que JPEG con calidad equivalente. Decode levemente
+    // más rápido en browsers modernos. Soporte universal en Chrome/Edge/Firefox/Safari.
     const blob = await new Promise((resolve) => {
-      canvas.toBlob((b) => resolve(b), "image/jpeg", quality);
+      canvas.toBlob((b) => resolve(b), "image/webp", quality);
     });
     if (!blob) return;
     const db = await openDB();

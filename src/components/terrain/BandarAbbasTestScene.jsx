@@ -8,6 +8,13 @@ import OrmuzTerrain, { setHorizonTuning } from "./OrmuzTerrain";
 import FFTOcean from "./FFTOcean";
 import WeatherSystem from "./WeatherSystem";
 import OSMAirport from "./OSMAirport";
+import OSMBuildings from "./OSMBuildings";
+import OSMBuildingsStreamed from "./OSMBuildingsStreamed";
+import OSMSyntheticBuildings from "./OSMSyntheticBuildings";
+import OSMRoadsStreamed from "./OSMRoadsStreamed";
+import OSMVegetationStreamed from "./OSMVegetationStreamed";
+import OSMTrees from "./OSMTrees";
+import StreamingTerrain from "./StreamingTerrain";
 import { fetchSatelliteCanvas } from "./terrainTiles";
 import {
   TERRAIN_CENTER_LAT, TERRAIN_CENTER_LON,
@@ -48,7 +55,8 @@ function CubeAvatar({ avatarPosRef }) {
     if (!ref.current) return;
     const k = keys.current;
     const fast = k.has("ShiftLeft") || k.has("ShiftRight");
-    const speed = fast ? 8000 : 1000;  // m/s
+    // Default = velocidad max F35C (~Mach 1.6 = 544 m/s). Shift = boost a 1000 m/s.
+    const speed = fast ? 1000 : 544;
 
     // Forward horizontal de la cámara (Y=0 → solo plano XZ)
     camera.getWorldDirection(_fwd);
@@ -146,7 +154,7 @@ function HUD({ avatarPosRef }) {
       <div>Este   : <span style={{ color: "#eef4ff" }}>{data.x.toFixed(0)} m</span></div>
       <div>Norte  : <span style={{ color: "#eef4ff" }}>{(-data.z).toFixed(0)} m</span></div>
       <div style={{ marginTop: 6, fontSize: 11, color: "#7a9ec4" }}>
-        WASD horizontal · Q/E vertical · Shift = 8x<br />
+        WASD horizontal · Q/E vertical · Shift = boost (1000 m/s)<br />
         Mouse drag = orbitar · scroll = zoom
       </div>
     </div>
@@ -419,9 +427,32 @@ export default function BandarAbbasTestScene() {
     offshoreAmount: 0.45, // 45%
   });
   const [horizonCfg, setHorizonCfg] = useState({
-    elev:  0.139,  // sin(8°) — bias del sample HDRI hacia arriba
-    clamp: 0.70,   // pre-clamp HDR para evitar quemar el sol
+    elev:  0.1736, // sin(10°) — bias del sample HDRI hacia arriba
+    clamp: 0.20,   // pre-clamp HDR (luminance-preserving) — kills sun bleach
   });
+  const [synthCfg, setSynthCfg] = useState({
+    pass1: true,
+    pass2: true,
+    urbanMin: 5,
+    urbanTarget: 35,
+  });
+  const [treeCfg, setTreeCfg] = useState({
+    scan: true,         // Pass A: scan z17 satelital
+    cityScatter: true,  // Pass B: scatter alrededor de buildings z14
+    perBuilding: 1.5,   // promedio de palms por building
+  });
+  const [layers, setLayers] = useState({
+    terrain: true,
+    water: true,
+    airport: true,
+    buildings: true,
+    synthetic: false,
+    roads: true,
+    vegetation: false,
+    trees: false,
+    streaming: true,
+  });
+  const toggleLayer = (k) => setLayers((s) => ({ ...s, [k]: !s[k] }));
   useEffect(() => {
     setHorizonTuning(horizonCfg);
   }, [horizonCfg]);
@@ -508,8 +539,71 @@ export default function BandarAbbasTestScene() {
           </label>
           <label style={{ display: "block" }}>
             HDR clamp: <span style={{ color: "#eef4ff" }}>{horizonCfg.clamp.toFixed(2)}</span>
-            <input type="range" min={0.5} max={4} step={0.05} value={horizonCfg.clamp}
+            <input type="range" min={0.05} max={4} step={0.05} value={horizonCfg.clamp}
               onChange={(e) => setHorizonCfg({ ...horizonCfg, clamp: parseFloat(e.target.value) })}
+              style={{ width: "100%" }} />
+          </label>
+        </div>
+        <div style={{ marginTop: 10, paddingTop: 8, borderTop: "1px solid rgba(173,191,214,0.18)" }}>
+          <div style={{ color: "#eef4ff", fontWeight: 600, marginBottom: 4 }}>Layers</div>
+          {[
+            ["terrain", "Terrain (sat + height)"],
+            ["water",   "Water (FFT ocean)"],
+            ["airport", "OSM Airport"],
+            ["buildings","OSM Buildings (real)"],
+            ["synthetic","Synthetic Buildings"],
+            ["roads",   "OSM Roads"],
+            ["vegetation","OSM Vegetation"],
+            ["trees",   "Trees (palm + acacia)"],
+            ["streaming","Streaming z17 (high-res)"],
+          ].map(([k, label]) => (
+            <label key={k} style={{ display: "block", marginBottom: 2, fontSize: 11 }}>
+              <input type="checkbox" checked={layers[k]} onChange={() => toggleLayer(k)} />
+              {" "}{label}
+            </label>
+          ))}
+        </div>
+        <div style={{ marginTop: 10, paddingTop: 8, borderTop: "1px solid rgba(173,191,214,0.18)" }}>
+          <div style={{ color: "#eef4ff", fontWeight: 600, marginBottom: 4 }}>Trees</div>
+          <label style={{ display: "block", marginBottom: 2, fontSize: 11 }}>
+            <input type="checkbox" checked={treeCfg.scan}
+              onChange={(e) => setTreeCfg({ ...treeCfg, scan: e.target.checked })} />
+            {" "}Pass A (z17 satellite scan)
+          </label>
+          <label style={{ display: "block", marginBottom: 2, fontSize: 11 }}>
+            <input type="checkbox" checked={treeCfg.cityScatter}
+              onChange={(e) => setTreeCfg({ ...treeCfg, cityScatter: e.target.checked })} />
+            {" "}Pass B (city scatter)
+          </label>
+          <label style={{ display: "block", marginBottom: 2 }}>
+            Trees per building: <span style={{ color: "#eef4ff" }}>{treeCfg.perBuilding.toFixed(1)}</span>
+            <input type="range" min={0} max={5} step={0.1} value={treeCfg.perBuilding}
+              onChange={(e) => setTreeCfg({ ...treeCfg, perBuilding: parseFloat(e.target.value) })}
+              style={{ width: "100%" }} />
+          </label>
+        </div>
+        <div style={{ marginTop: 10, paddingTop: 8, borderTop: "1px solid rgba(173,191,214,0.18)" }}>
+          <div style={{ color: "#eef4ff", fontWeight: 600, marginBottom: 4 }}>Synthetic buildings</div>
+          <label style={{ display: "block", marginBottom: 4, fontSize: 11 }}>
+            <input type="checkbox" checked={synthCfg.pass1}
+              onChange={(e) => setSynthCfg({ ...synthCfg, pass1: e.target.checked })} />
+            {" "}Pass 1 (landuse-driven)
+          </label>
+          <label style={{ display: "block", marginBottom: 4, fontSize: 11 }}>
+            <input type="checkbox" checked={synthCfg.pass2}
+              onChange={(e) => setSynthCfg({ ...synthCfg, pass2: e.target.checked })} />
+            {" "}Pass 2 (density-driven)
+          </label>
+          <label style={{ display: "block", marginBottom: 4 }}>
+            Urban min: <span style={{ color: "#eef4ff" }}>{synthCfg.urbanMin}</span>
+            <input type="range" min={1} max={20} step={1} value={synthCfg.urbanMin}
+              onChange={(e) => setSynthCfg({ ...synthCfg, urbanMin: parseInt(e.target.value) })}
+              style={{ width: "100%" }} />
+          </label>
+          <label style={{ display: "block" }}>
+            Urban target: <span style={{ color: "#eef4ff" }}>{synthCfg.urbanTarget}</span>
+            <input type="range" min={10} max={120} step={1} value={synthCfg.urbanTarget}
+              onChange={(e) => setSynthCfg({ ...synthCfg, urbanTarget: parseInt(e.target.value) })}
               style={{ width: "100%" }} />
           </label>
         </div>
@@ -520,7 +614,8 @@ export default function BandarAbbasTestScene() {
         gl={{
           logarithmicDepthBuffer: true,
           antialias: true,
-          toneMapping: THREE.NoToneMapping,
+          toneMapping: THREE.ACESFilmicToneMapping,
+          toneMappingExposure: 0.9,
         }}
         shadows={{ type: THREE.PCFShadowMap }}
       >
@@ -538,7 +633,7 @@ export default function BandarAbbasTestScene() {
           maxPolarAngle={Math.PI * 0.49}
         />
 
-        {MAPBOX_TOKEN && (
+        {layers.terrain && MAPBOX_TOKEN && (
           <OrmuzTerrain
             token={MAPBOX_TOKEN}
             groundY={0}
@@ -546,24 +641,61 @@ export default function BandarAbbasTestScene() {
           />
         )}
 
-        {/* OSM Airport — runways, taxiways, aprons, terminales, hangares
-            extraídos de OpenStreetMap (OIKB / Bandar Abbas Intl). */}
-        <OSMAirport y={5.5} />
+        {layers.streaming && MAPBOX_TOKEN && (
+          <StreamingTerrain
+            token={MAPBOX_TOKEN}
+            chunkSize={8}
+            activeRadius={2}      // 5×5=25 chunks (~11km cuadrado)
+            predictSec={4}        // 4s lookahead (a 544m/s ≈ 2.2km = 1 chunk)
+            predictRadius={2}     // 5×5=25 chunks de prefetch
+            maxConcurrent={4}
+          />
+        )}
+
+        {layers.airport && <OSMAirport y={5.5} />}
+
+        {layers.buildings && <OSMBuildingsStreamed y={0} activeRadiusKm={20} />}
+
+        {layers.synthetic && (
+          <OSMSyntheticBuildings
+            y={0}
+            maxDistanceKm={110}
+            pass1Enabled={synthCfg.pass1}
+            pass2Enabled={synthCfg.pass2}
+            urbanMin={synthCfg.urbanMin}
+            urbanTarget={synthCfg.urbanTarget}
+          />
+        )}
+
+        {layers.roads && <OSMRoadsStreamed y={0} activeRadiusKm={20} />}
+
+        {layers.vegetation && <OSMVegetationStreamed y={0} activeRadiusKm={20} />}
+
+        {layers.trees && (
+          <OSMTrees
+            y={0}
+            z14ScatterMaxKm={200}
+            scanZ17={treeCfg.scan}
+            scatterZ14={treeCfg.cityScatter}
+            treesPerBuilding={treeCfg.perBuilding}
+          />
+        )}
 
         {/* Water shader: Gerstner waves geométricas, Fresnel, HDRI reflection,
             sun specular, foam en crestas. Plano sigue cámara, fade a alpha=0
             en 35-45 km para evitar plane-edge halo contra HDRI. Water mask
             del outer z10 satellite — discard sobre tierra. */}
-        {/* FFT ocean estático cubriendo todo el área (mismo size que el mask). */}
-        <FFTOcean
-          size={32000} segments={1024} patchSize={2000} resolution={256} y={-2} followCamera={true}
-          phillipsA={2e-2} windSpeed={28}
-          coastWaveAngle={waveCfg.coastAngle}
-          coastFoamAmount={waveCfg.coastAmount}
-          offshoreFoamAmount={waveCfg.offshoreAmount}
-          horizonElev={horizonCfg.elev}
-          horizonClamp={horizonCfg.clamp}
-        />
+        {layers.water && (
+          <FFTOcean
+            size={32000} segments={1024} patchSize={2000} resolution={256} y={-2} followCamera={true}
+            phillipsA={2e-2} windSpeed={28}
+            coastWaveAngle={waveCfg.coastAngle}
+            coastFoamAmount={waveCfg.coastAmount}
+            offshoreFoamAmount={waveCfg.offshoreAmount}
+            horizonElev={horizonCfg.elev}
+            horizonClamp={horizonCfg.clamp}
+          />
+        )}
       </Canvas>
     </main>
   );

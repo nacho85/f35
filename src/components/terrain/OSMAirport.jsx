@@ -2,21 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import * as THREE from "three";
-import { TERRAIN_CENTER_LAT, TERRAIN_CENTER_LON } from "./terrainScale";
-
-// Equirectangular projection alrededor de TERRAIN_CENTER. Para distancias <
-// ~50km a esa latitud, error < 1m vs Mercator. Bandar Abbas está en lat 27°.
-const EARTH_CIRC = 40075016.686;
-const M_PER_LON = (EARTH_CIRC * Math.cos((TERRAIN_CENTER_LAT * Math.PI) / 180)) / 360;
-const M_PER_LAT = EARTH_CIRC / 360;
-
-function llToWorld(lat, lon) {
-  // World +X = este, +Z = sur (= lat menor).
-  return [
-    (lon - TERRAIN_CENTER_LON) * M_PER_LON,
-    (TERRAIN_CENTER_LAT - lat) * M_PER_LAT,
-  ];
-}
+import { llToWorld } from "./osmProjection";
 
 // Strip mesh siguiendo un polyline con ancho dado perpendicular a la dirección.
 function buildStripGeometry(points, width) {

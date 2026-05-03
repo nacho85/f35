@@ -514,7 +514,10 @@ const FRAG = /* glsl */ `
         vec3 _viewDir = normalize(vWorldPos - uCameraPosW);
         vec3 _skyDir = normalize(vec3(_viewDir.x, uHorizonElev, _viewDir.z));
         horizonColor = textureCube(uEnvMap, _skyDir).rgb * uEnvIntensity;
-        horizonColor = min(horizonColor, vec3(uHorizonClamp));
+        // Luminance-preserving clamp: si la luminancia supera el threshold,
+        // escalamos uniforme. Mantiene el hue (no hay rainbow per-channel).
+        float _lum = dot(horizonColor, vec3(0.299, 0.587, 0.114));
+        if (_lum > uHorizonClamp) horizonColor *= uHorizonClamp / _lum;
         horizonColor = horizonColor / (1.0 + horizonColor);
         horizonColor *= 2.0;
       } else {

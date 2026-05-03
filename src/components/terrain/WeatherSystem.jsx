@@ -40,7 +40,7 @@ const PRESETS = {
     // WT donde montañas distantes se desaturan en tono azul-grisaceo.
     // ~5% a 50km, ~22% a 100km, ~63% a 200km, ~95% a 300km.
     file: "/textures/sky/qwantani_4k.hdr",
-    fogDensity: 0.000018, fogColor: "#7a96b8",
+    fogDensity: 0.000012, fogColor: "#6488a8",
     sunMultiplier: 1.0, ambientBase: 0.30,
     horizonTint: "#7eb6e8",
     clouds: null,

@@ -24,6 +24,21 @@ const RINGS = [
   { name: "inner14", zoom: 14, gridSize: 80, tileShiftX: 0, tileShiftY: 32, dataset: "mapbox.satellite", ext: "jpg90", localExt: "jpg" },
   // Airport overlay: z17 patch ~8.7 km centrado en TFB.9 — alta resolución para volar bajo
   { name: "airport", zoom: 17, gridSize: 48, dataset: "mapbox.satellite", ext: "jpg90", localExt: "jpg" },
+  // PLAYABLE z17: 640×640 tiles (~174 km cuadrado), shifted ~70km al sur para
+  // matchear el playable map (centrado en inner14 center). Skip-water usando
+  // manifest z15 (parent tile) → ~150k tiles reales, ~4.5 GB en disco.
+  // Re-ejecutable: existSync skipea, así se puede partir entre quotas mensuales.
+  {
+    name: "playable_z17",
+    zoom: 17,
+    gridSize: 640,
+    tileShiftY: 256,    // ~70 km al sur (256 tiles × 272m = 69.6 km)
+    dataset: "mapbox.satellite",
+    ext: "jpg90",
+    localExt: "jpg",
+    skipWater: true,
+    skipWaterFromZoom: 15,  // usa parent tile z15 para consultar manifest
+  },
   { name: "h_out",  zoom: 10, gridSize: 32, dataset: "mapbox.terrain-rgb", ext: "pngraw", localExt: "png" },
   { name: "h_fine", zoom: 13, gridSize: 48, tileShiftY: 16, dataset: "mapbox.terrain-rgb", ext: "pngraw", localExt: "png" },
 ];
@@ -74,13 +89,19 @@ async function downloadRing(ring) {
   const half = Math.floor(ring.gridSize / 2);
 
   // Si el ring tiene skipWater, cargar el manifest y skipear los tiles agua.
+  // Si skipWaterFromZoom está set, usa el manifest de ese zoom (típicamente
+  // más bajo) y consulta por parent tile — útil cuando el manifest del zoom
+  // del ring no existe.
   let waterSet = null;
+  let waterShift = 0; // ring.zoom - manifestZoom → bit shift para parent
   if (ring.skipWater) {
-    const manifestPath = `public/water-manifest-z${ring.zoom}.json`;
+    const wmZoom = ring.skipWaterFromZoom ?? ring.zoom;
+    waterShift = ring.zoom - wmZoom;
+    const manifestPath = `public/water-manifest-z${wmZoom}.json`;
     if (existsSync(manifestPath)) {
       const m = JSON.parse(readFileSync(manifestPath, "utf8"));
       waterSet = new Set(m.water);
-      console.log(`  → skip-water: ${waterSet.size} tiles agua del manifest`);
+      console.log(`  → skip-water z${wmZoom}: ${waterSet.size} tiles agua del manifest (shift=${waterShift})`);
     } else {
       console.warn(`  ! ${manifestPath} no existe — corré scripts/generate-water-manifest.mjs primero`);
     }
@@ -92,7 +113,11 @@ async function downloadRing(ring) {
     for (let col = 0; col < ring.gridSize; col++) {
       const x = cx - half + col;
       const y = cy - half + row;
-      if (waterSet && waterSet.has(`${x},${y}`)) { skipped++; continue; }
+      if (waterSet) {
+        const px = x >> waterShift;
+        const py = y >> waterShift;
+        if (waterSet.has(`${px},${py}`)) { skipped++; continue; }
+      }
       const url = `https://api.mapbox.com/v4/${ring.dataset}/${ring.zoom}/${x}/${y}.${ring.ext}?access_token=${TOKEN}`;
       const datasetPath = ring.dataset.replace("mapbox.", "");
       const localPath = `public/tiles/${datasetPath}/${ring.zoom}/${x}/${y}.${ring.localExt}`;

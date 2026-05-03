@@ -35,6 +35,8 @@ import {
 import { fetchHeightmapCanvas, fetchSatelliteCanvas } from "./terrainTiles";
 import { getCachedCanvas, putCachedCanvas } from "./terrainCache";
 import { getSharedCoastlineSDF } from "./coastlineSDFTexture";
+import { setSharedHeightmap, setSharedHeightmapOuter } from "./sharedHeightmap";
+import { setSharedAirportCanvas } from "./sharedAirportCanvas";
 
 // Bump si cambia el pipeline de stitching, water manifest, o tile data.
 // Invalida todas las entradas de IndexedDB con esta versión vieja.
@@ -603,7 +605,9 @@ function applyAerialPerspective(material, gl) {
             vec3 _viewDir = normalize(_toFrag);
             vec3 _skyDir = normalize(vec3(_viewDir.x, uHorizonElev, _viewDir.z));
             _hzCol = textureCube(uHorizonEnv, _skyDir).rgb;
-            _hzCol = min(_hzCol, vec3(uHorizonClamp));
+            // Luminance-preserving clamp (hue intact, sin rainbow per-channel)
+            float _lumHz = dot(_hzCol, vec3(0.299, 0.587, 0.114));
+            if (_lumHz > uHorizonClamp) _hzCol *= uHorizonClamp / _lumHz;
             _hzCol = _hzCol / (1.0 + _hzCol);
             _hzCol *= 2.0;
           } else {
@@ -934,6 +938,41 @@ export default function OrmuzTerrain({ token, groundY = 0, onProgress }) {
         outerHeightTex.generateMipmaps = false;
         outerHeightTex.wrapS = outerHeightTex.wrapT = THREE.ClampToEdgeWrapping;
 
+        // Compartimos el heightmap fine (z13, ~140km cuadrado centrado en
+        // TFB.9) para que OSMBuildings y otros placement components puedan
+        // samplear elevación CPU-side y posicionar geometría sobre el terreno.
+        setSharedHeightmap({
+          canvas: heightFine.canvas,
+          maxElev: heightFine.maxElevation,
+          minElev: heightFine.displacementBias ?? 0,
+          worldSize: WT_HEIGHT_FINE_WORLD_SIZE,
+          centerX: heightCenterX_real,
+          centerZ: heightCenterZ_real,
+        });
+
+        // Compartimos la satelital z17 del airport (~7.3km cuadrado, 0.85m/px)
+        // para que OSMTrees pueda escanear pixeles y detectar árboles.
+        setSharedAirportCanvas({
+          canvas: airportCanvas,
+          worldSize: WT_AIRPORT_WORLD_SIZE,
+          centerX: -SNAP_Z17.x,
+          centerZ: -SNAP_Z17.z,
+        });
+
+        // Heightmap outer z10 (~1100km cuadrado, baja res) como fallback para
+        // sample fuera del fine z13. Sin esto, geometría a >70km de TFB.9 cae
+        // a y=0 y queda enterrada/flotando vs el terreno z10. yOffset=-20
+        // matchea el position.y del outer mesh.
+        setSharedHeightmapOuter({
+          canvas: heightOuter.canvas,
+          maxElev: heightOuter.maxElevation,
+          minElev: heightOuter.displacementBias ?? 0,
+          worldSize: WT_OUTER_WORLD_SIZE,
+          centerX: -SNAP_Z10.x,
+          centerZ: -SNAP_Z10.z,
+          yOffset: -20,
+        });
+
         setData({
           subs,
           airportTex: makeSatTex(airportCanvas),
@@ -1017,12 +1056,9 @@ export default function OrmuzTerrain({ token, groundY = 0, onProgress }) {
         map: data.airportTex,
         displacementMap: data.airportHeightTex,
         displacementScale: data.fineScale,
-        // +5m bias (no +1m): el mesh airport (64 seg sobre 8.7km) y el inner14
-        // (256 seg sobre 35km) tienen densidades parecidas pero los vertices
-        // no se alinean exacto. La interpolación lineal entre vertices da
-        // valores levemente distintos a cualquier punto interior. 5m de
-        // separación absorbe ese error y elimina z-fighting.
-        displacementBias:  data.fineBias + 5,
+        // +0.1m bias: airport patch apenas arriba del inner14 — separación
+        // mínima para evitar z-fighting pero invisible visualmente.
+        displacementBias:  data.fineBias + 0.1,
         roughness: 0.96,
         metalness: 0,
         // Transparent + depthWrite false → el airport patch alpha-blendea

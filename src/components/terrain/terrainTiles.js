@@ -2,6 +2,7 @@
 
 import * as THREE from "three";
 import { TILE_PX } from "./terrainScale";
+import { stitchInWorker, stitchSupported } from "./tileStitchPool";
 
 function lonToTileX(lon, zoom) {
   return Math.floor(((lon + 180) / 360) * 2 ** zoom);
@@ -26,9 +27,12 @@ function loadImage(url) {
 // Water-tile manifest. Los tiles agua no se descargan ni del cache local ni de
 // Mapbox — se rellenan con un color uniforme sampleado de tiles costeros
 // reales (matchea tonalmente con la imagen de Mapbox alrededor). Carga lazy.
-const _waterManifests = new Map(); // zoom → Promise<{ set, color } | null>
+//
+// Además del set de agua, computamos el "coastal set" = tiles agua con al
+// menos un vecino que NO es agua. Los z17 hijos de un z15 NO-coastal (= deep
+// water) no existen en disco — no tiene sentido pedirlos.
+const _waterManifests = new Map(); // zoom → Promise<{ set, coastal, color } | null>
 const FALLBACK_WATER_FILL = "#3a5878";
-// Solo z15 tiene manifest bakeado. Otros zooms → null sin fetch (evita 404).
 const AVAILABLE_WATER_MANIFESTS = new Set([15]);
 function loadWaterManifest(zoom) {
   if (_waterManifests.has(zoom)) return _waterManifests.get(zoom);
@@ -39,7 +43,24 @@ function loadWaterManifest(zoom) {
   }
   const p = fetch(`/water-manifest-z${zoom}.json`)
     .then((r) => (r.ok ? r.json() : null))
-    .then((j) => (j ? { set: new Set(j.water), color: j.waterColor || FALLBACK_WATER_FILL } : null))
+    .then((j) => {
+      if (!j) return null;
+      const set = new Set(j.water);
+      // Compute coastal set: water tiles con al menos un vecino NO water.
+      const coastal = new Set();
+      for (const k of set) {
+        const [tx, ty] = k.split(",").map(Number);
+        let hasLand = false;
+        for (let dy = -1; dy <= 1 && !hasLand; dy++) {
+          for (let dx = -1; dx <= 1 && !hasLand; dx++) {
+            if (dx === 0 && dy === 0) continue;
+            if (!set.has((tx + dx) + "," + (ty + dy))) hasLand = true;
+          }
+        }
+        if (hasLand) coastal.add(k);
+      }
+      return { set, coastal, color: j.waterColor || FALLBACK_WATER_FILL };
+    })
     .catch(() => null);
   _waterManifests.set(zoom, p);
   return p;
@@ -63,35 +84,86 @@ async function stitchTiles({ token, lat, lon, zoom, gridSize, kind, tileOffsetX 
 
   const isSat = kind === "satellite";
   const localExt = isSat ? "jpg" : "png";
-  const remoteExt = isSat ? "jpg90" : "pngraw";
   const dataset  = isSat ? "satellite" : "terrain-rgb";
-  const remoteDataset = isSat ? "mapbox.satellite" : "mapbox.terrain-rgb";
 
   // Pre-fill toda la textura con el color de agua sampleado del manifest.
   // Los tiles que NO son agua se dibujan encima. Así, si un tile está en el
   // manifest agua, simplemente lo skipeamos sin fetch — el fill queda visible.
+  // Para zooms > 15 (sin manifest propio), usamos parent z15 para el water-skip.
   const manifest = isSat ? await loadWaterManifest(zoom) : null;
   const waterSet = manifest?.set ?? null;
+  // Parent water set: si el zoom es mayor que 15, cargamos el manifest z15
+  // y consultamos por parent tile (x>>shift, y>>shift). Esto evita 404s en
+  // streaming z17 sobre océano (no hay tiles locales — agua pura).
+  let parentWaterSet = null, parentCoastalSet = null, parentShift = 0;
+  if (isSat && zoom > 15) {
+    const pManifest = await loadWaterManifest(15);
+    if (pManifest) {
+      parentWaterSet = pManifest.set;
+      parentCoastalSet = pManifest.coastal;
+      parentShift = zoom - 15;
+      if (!manifest) {
+        ctx.fillStyle = pManifest.color;
+        ctx.fillRect(0, 0, px, px);
+      }
+    }
+  }
   if (manifest) {
     ctx.fillStyle = manifest.color;
     ctx.fillRect(0, 0, px, px);
   }
 
-  const tasks = [];
+  // Construir lista de tasks (URLs a fetchear). El skip-logic aplica acá:
+  // tiles agua del zoom actual o cuyos parent z15 son deep-water no entran.
+  const taskList = [];
   for (let row = 0; row < gridSize; row++) {
     for (let col = 0; col < gridSize; col++) {
       const x = cx - half + col;
       const y = cy - half + row;
-      if (waterSet && waterSet.has(`${x},${y}`)) continue; // tile agua — skip
-      const localUrl  = `/tiles/${dataset}/${zoom}/${x}/${y}.${localExt}`;
-      const remoteUrl = `https://api.mapbox.com/v4/${remoteDataset}/${zoom}/${x}/${y}.${remoteExt}?access_token=${token}`;
-      tasks.push(
-        loadImage(localUrl)
-          .catch(() => loadImage(remoteUrl))
-          .then(img => ctx.drawImage(img, col * tilePx, row * tilePx, tilePx, tilePx))
-      );
+      if (waterSet && waterSet.has(`${x},${y}`)) continue; // tile agua del zoom actual — skip
+      if (parentWaterSet) {
+        const px15 = x >> parentShift;
+        const py15 = y >> parentShift;
+        const pKey = px15 + "," + py15;
+        if (parentWaterSet.has(pKey)) {
+          if (!parentCoastalSet.has(pKey)) continue; // deep water — sin disco, sin request
+          // coastal: intentar tile local
+        }
+      }
+      const localUrl = `/tiles/${dataset}/${zoom}/${x}/${y}.${localExt}`;
+      taskList.push({ url: localUrl, col, row });
     }
   }
+
+  // Path satellite con worker — fetch + decode + stitch off-thread, evita
+  // hitches en el main thread cuando StreamingTerrain carga chunks nuevos.
+  // El worker devuelve un ImageBitmap; lo dibujamos al canvas existente
+  // (que ya tiene el waterColor de fondo) para mantener compat con cache
+  // (toBlob) y CanvasTexture en los consumers.
+  if (isSat && stitchSupported()) {
+    try {
+      const waterColor = manifest?.color || (parentWaterSet ? (await loadWaterManifest(15))?.color : null) || null;
+      const bitmap = await stitchInWorker({
+        tasks: taskList,
+        gridSize,
+        tilePx,
+        waterColor,
+      });
+      ctx.drawImage(bitmap, 0, 0);
+      bitmap.close?.();
+      return canvas;
+    } catch (e) {
+      // Fallback al path de main thread si el worker falla
+      console.warn("[stitchTiles] worker failed, fallback to main thread:", e);
+    }
+  }
+
+  // Fallback: main thread (terrain RGB siempre, satellite si worker no soportado)
+  const tasks = taskList.map(({ url, col, row }) =>
+    loadImage(url)
+      .then(img => ctx.drawImage(img, col * tilePx, row * tilePx, tilePx, tilePx))
+      .catch(() => {})
+  );
   await Promise.all(tasks);
   return canvas;
 }
